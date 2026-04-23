@@ -1218,8 +1218,15 @@ function focusShpProject(id) {
   const proj=shpProjects.value.find(p=>p.id===id);
   if(!proj) return;
   selectedShpId.value=id;
-  if(suiviMode.value==='annuel'&&annMapInst&&proj.fc){
-    try{const b=L.geoJSON(proj.fc).getBounds();if(b.isValid())annMapInst.fitBounds(b,{padding:[30,30]});}catch(e){}
+  if(suiviMode.value==='annuel'&&annMapInst){
+    try{
+      const projAOIs=annProjectAOIsYear.value.find(x=>x.projectId===proj.id);
+      const hulls=projAOIs?.aois?.map(a=>a.hull).filter(Boolean)||[];
+      const src=hulls.length
+        ?{type:'FeatureCollection',features:hulls}
+        :proj.fc;
+      if(src){const b=L.geoJSON(src).getBounds();if(b.isValid())annMapInst.fitBounds(b,{padding:[40,40]});}
+    }catch(e){}
   } else if(proj._layer&&shpMapInst){
     try{const b=proj._layer.getBounds();if(b.isValid())shpMapInst.fitBounds(b,{padding:[30,30]});}catch(e){}
   }
