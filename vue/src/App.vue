@@ -527,10 +527,7 @@ const shpProjects = ref([]);
 let shpNextId = 1;
 const selectedShpId = ref(null);
 
-// Offset initial : curYear centré dans la fenêtre, borné à [0, maxOffset]
-const timelineOffset = ref(
-  Math.max(0, Math.min(curYear - 2020 - Math.floor(TIMELINE_VISIBLE / 2), TIMELINE_MAX_OFFSET))
-);
+const timelineOffset = ref(Math.min(curYear - 2020, TIMELINE_MAX_OFFSET));
 
 const visibleYears = computed(() =>
   ALL_YEARS.slice(timelineOffset.value, timelineOffset.value + TIMELINE_VISIBLE)
