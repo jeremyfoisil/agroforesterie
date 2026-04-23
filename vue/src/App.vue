@@ -343,11 +343,11 @@
                 <div style="background:var(--blue-pale);border:1px solid #bbdefb;border-radius:var(--r-sm);padding:10px 12px;margin:4px 0 8px;font-size:12px">
                   <div style="display:flex;justify-content:space-between;margin-bottom:4px">
                     <span style="color:var(--gray-600)">Acquisitions séparées :</span>
-                    <span v-html="fmtKm2Compare(annPricing.rawAreaInd, annPricing.pleiAreaInd)"></span>
+                    <span v-html="fmtKm2Compare(annPricing.rawAreaInd, annPricing.rawAreaInd)"></span>
                   </div>
                   <div style="display:flex;justify-content:space-between;margin-bottom:4px">
                     <span style="color:var(--gray-600)">Après mutualisation :</span>
-                    <span style="font-weight:600" v-html="fmtKm2Compare(annPricing.rawAreaCons, annPricing.pleiAreaCons)"></span>
+                    <span style="font-weight:600" v-html="fmtKm2Compare(annPricing.rawAreaCons, annPricing.rawAreaCons)"></span>
                   </div>
                   <div style="display:flex;justify-content:space-between;border-top:1px solid #bbdefb;padding-top:4px;margin-top:2px">
                     <span style="color:var(--blue);font-weight:600">Économie mutualisation :</span>
@@ -711,27 +711,25 @@ const annTotalAOIsYear     = computed(() => annProjectAOIsYear.value.reduce((s,p
 const annHasAreaYear       = computed(() => annProjectAOIsYear.value.some(p=>p.aois.some(a=>a.area>0)));
 
 const annPricing = computed(()=>{
-  const MIN_KM2=100;
+  const MIN_KM2=100, PLEI_FLOOR=3500;
   const rate=annEffRate.value, pad=annPadding.value;
   // Surface Pléiades calculée sur les projets actifs de l'année uniquement
   const rawAreaInd =annConsolidationYear.value.individualArea*pad;
   const rawAreaCons=annConsolidationYear.value.totalArea*pad;
-  const pleiAreaInd  =Math.max(rawAreaInd,MIN_KM2);
-  const pleiAreaCons =Math.max(rawAreaCons,MIN_KM2);
-  const pleiCostInd  =pleiAreaInd*rate;
-  const pleiCostCons =pleiAreaCons*rate;
+  const pleiCostInd  =rawAreaInd  <MIN_KM2?PLEI_FLOOR:rawAreaInd  *rate;
+  const pleiCostCons =rawAreaCons<MIN_KM2?PLEI_FLOOR:rawAreaCons*rate;
   const savings=pleiCostInd-pleiCostCons;
   const pleiCost=Math.min(pleiCostInd,pleiCostCons);
-  const pleiArea=pleiCost===pleiCostCons?pleiAreaCons:pleiAreaInd;
+  const pleiArea=rawAreaCons<MIN_KM2?rawAreaInd:(pleiCost===pleiCostCons?rawAreaCons:rawAreaInd);
   // Coûts monitoring filtrés par année (init et suivi N+3)
   const initCost =yearNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0);
   const suiviCost=yearSuiviOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*0.5,0);
   const hasActivity=yearNewOnes.value.length>0||yearSuiviOnes.value.length>0;
   const totalHT=(hasActivity?sub.value:0)+initCost+suiviCost+pleiCost;
-  return {initCost,suiviCost,pleiCost,pleiArea,pleiAreaInd,pleiAreaCons,
+  return {initCost,suiviCost,pleiCost,pleiArea,
           rawAreaInd,rawAreaCons,savings,pleiCostInd,pleiCostCons,
           totalHT,tva:totalHT*0.2,ttc:totalHT*1.2,
-          minApplies:rawAreaInd<MIN_KM2||rawAreaCons<MIN_KM2};
+          minApplies:rawAreaInd<MIN_KM2||rawAreaCons<MIN_KM2,pleiFloorApplies:rawAreaInd<MIN_KM2};
 });
 
 function annProjInfo(p) {
