@@ -745,7 +745,8 @@ function annProjInfo(p) {
 }
 function annProjMonCost(p) {
   const price=computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-  return p.isNew?price:price*0.5;
+  const isInit=yearNewOnes.value.some(x=>x.id===p.id);
+  return isInit?price:price*0.5;
 }
 
 function fmtKm2Compare(raw,eff) {
@@ -1175,7 +1176,7 @@ async function loadShpFile(file) {
     const totalLengthM=features.reduce((s,f)=>s+geomLength(f.geometry),0);
     const fc={type:'FeatureCollection',features};
     const color=SHP_COLORS[shpProjects.value.length%SHP_COLORS.length];
-    const yearInName = name.match(/\b(20\d{2})\b/)?.[1];
+    const yearInName = name.match(/(20\d{2})/)?.[1];
     const annee = yearInName ? parseInt(yearInName) : (shpYear.value || new Date().getFullYear());
     const suiviYears=defaultSuiviYears(annee);
     const proj={id:shpNextId++,name,haiesCount,totalLengthM,isNew:true,color,fc,dbId:null,annee,suiviYears};
@@ -1211,13 +1212,17 @@ async function toggleShpStatus(id) {
 function focusShpProject(id) {
   if(selectedShpId.value===id){
     selectedShpId.value=null;
-    fitShpMap();
+    if(suiviMode.value==='annuel'&&annMapInst) updateAnnMap(); else fitShpMap();
     return;
   }
   const proj=shpProjects.value.find(p=>p.id===id);
-  if(!proj||!proj._layer) return;
+  if(!proj) return;
   selectedShpId.value=id;
-  try{const b=proj._layer.getBounds();if(b.isValid())shpMapInst.fitBounds(b,{padding:[30,30]});}catch(e){}
+  if(suiviMode.value==='annuel'&&annMapInst&&proj.fc){
+    try{const b=L.geoJSON(proj.fc).getBounds();if(b.isValid())annMapInst.fitBounds(b,{padding:[30,30]});}catch(e){}
+  } else if(proj._layer&&shpMapInst){
+    try{const b=proj._layer.getBounds();if(b.isValid())shpMapInst.fitBounds(b,{padding:[30,30]});}catch(e){}
+  }
 }
 
 // ── Supabase: load from DB ────────────────────────────────────────────────
@@ -1226,9 +1231,13 @@ async function loadProjectsFromDB() {
   if(error){console.error('Supabase load error:',error);return;}
   if(!data||!data.length) return;
   for(const row of data){
+    const yearInName = row.nom.match(/(20\d{2})/)?.[1];
+    const annee = yearInName ? parseInt(yearInName) : (row.annee||new Date().getFullYear());
+    if(yearInName && annee !== row.annee)
+      supabase.from('projets_agroforesterie').update({annee}).eq('id',row.id);
     const proj={id:shpNextId++,dbId:row.id,name:row.nom,haiesCount:row.haies_count,
       totalLengthM:row.total_length_m,isNew:row.is_new,color:row.couleur,fc:row.geojson,
-      annee:row.annee||new Date().getFullYear(),suiviYears:row.suivi_years||[]};
+      annee,suiviYears:row.suivi_years||[]};
     shpProjects.value.push(proj);
     if(proj.fc) addShpToMap(proj);
   }
