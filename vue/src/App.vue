@@ -157,16 +157,6 @@
             <span>{{ fmtLen(shpTotalLen) }} de haies</span>
           </div>
 
-          <!-- Projection slider -->
-          <div class="sec-div" style="margin-top:16px">Projection — nouveaux projets / an</div>
-          <div class="fgroup">
-            <div class="flabel"><span>Nouveaux projets / an</span><span class="fval">{{ projPerYr }}</span></div>
-            <input type="range" min="0" max="30" step="1" v-model.number="projPerYr">
-            <div class="irow"><input type="number" min="0" max="30" v-model.number="projPerYr" style="width:65px"><span>projets/an (forecasters)</span></div>
-          </div>
-          <div style="font-size:11px;color:var(--gray-600);background:var(--gray-100);border-radius:var(--r-sm);padding:8px 10px;margin-top:4px;line-height:1.5">
-            Initialisés en N → premiers suivis en N+3 · coût moyen des projets actuels appliqué aux forecasters.
-          </div>
         </div>
 
         <!-- Pléiades AOI overview (annuel mode only) -->
@@ -397,7 +387,7 @@
           <!-- ── Projections sub-tab ── -->
           <div v-show="evalSubTab==='projections'">
             <p style="font-size:12px;color:var(--gray-600);margin-bottom:14px">
-              Projections 2020 → 2050 — <strong>{{ projPerYr }} nouveau{{ projPerYr > 1 ? 'x' : '' }} projet{{ projPerYr > 1 ? 's' : '' }}</strong> s'ajoutent chaque année à partir de {{ shpYear + 1 }}.
+              Projections 2020 → 2050 — données issues des fichiers chargés + projets supplémentaires renseignés manuellement dans la colonne <strong>+&nbsp;Manuel</strong>.
               <span v-if="suiviMode==='triennal'">Projets initialisés en N → premiers suivis en N+3.</span>
               <span v-else style="color:var(--blue)">Suivi annuel : tous les projets antérieurs sont imagés chaque année — coût Pléiades estimé d'après l'année de référence.</span>
               <span style="margin-left:6px;color:var(--gray-600)">· Ligne <span style="background:var(--green-pale);padding:1px 5px;border-radius:4px;font-weight:700;color:var(--green)">verte</span> = année sélectionnée · <span style="color:var(--blue)">Bleu</span> = années futures</span>
@@ -406,7 +396,7 @@
               <table class="proj-tbl">
                 <thead>
                   <tr>
-                    <th>Année</th><th>Total projets</th><th>Dont nouveaux</th><th>Dont suivis</th>
+                    <th>Année</th><th>Total projets</th><th>Fichiers</th><th>+ Manuel</th><th>Dont suivis</th>
                     <th>Abonnement</th><th>Initialisation</th><th>Suivi</th>
                     <th v-if="suiviMode==='annuel'" style="color:#90caf9">Pléiades (est.)</th>
                     <th>Total HT</th>
@@ -417,7 +407,8 @@
                       :class="{'proj-row-selected': row.isSelected, 'proj-row-future': row.isFuture && !row.isSelected}">
                     <td><strong>{{ row.year }}</strong> <span v-if="row.isSelected" class="pill">Sélectionnée</span></td>
                     <td class="hl">{{ row.total }}</td>
-                    <td>{{ row.newCount }}</td>
+                    <td>{{ row.realNewCount }}</td>
+                    <td><input type="number" min="0" :value="manualNewPerYear[row.year] || 0" @input="manualNewPerYear[row.year] = +$event.target.value || 0" style="width:48px;padding:2px 4px;border:1.5px solid var(--gray-200);border-radius:4px;font-size:12px;text-align:center" placeholder="0"></td>
                     <td>{{ row.exCount }}</td>
                     <td class="amt" :style="{color: row.newCount === 0 && row.exCount === 0 ? 'var(--gray-200)' : ''}">
                       {{ row.newCount === 0 && row.exCount === 0 ? '—' : fmt(sub) }}
@@ -517,8 +508,13 @@ const annBufferM    = ref(75);
 const annClusterM   = ref(500);
 const annConsolKm   = ref(5);
 
-// ── Standard tab params ───────────────────────────────────────────────────
-const projPerYr      = ref(0);
+// ── Manual extra projects per year (persisted in localStorage) ───────────
+const manualNewPerYear = reactive(
+  JSON.parse(localStorage.getItem('manualNewPerYear') || '{}')
+);
+watch(manualNewPerYear, () => {
+  localStorage.setItem('manualNewPerYear', JSON.stringify(manualNewPerYear));
+}, { deep: true });
 
 // ── Year options ──────────────────────────────────────────────────────────
 const curYear    = new Date().getFullYear();
@@ -646,11 +642,10 @@ const projectionRows = computed(() => {
   const rows = [];
 
   for (const year of ALL_YEARS) {
-    // Les forecasts s'accumulent à partir de shpYear+1
-    if (year > startYear) {
-      for (let j = 0; j < projPerYr.value; j++) {
-        forecasts.push({ annee: year, price: avgPrice });
-      }
+    // Les extras manuels s'appliquent à toutes les années
+    const extras = manualNewPerYear[year] || 0;
+    for (let j = 0; j < extras; j++) {
+      forecasts.push({ annee: year, price: avgPrice });
     }
 
     const realInit  = shpProjects.value.filter(p => p.annee === year);
@@ -670,6 +665,7 @@ const projectionRows = computed(() => {
 
     const total    = shpProjects.value.filter(p => p.annee <= year).length
                    + forecasts.filter(p => p.annee <= year).length;
+    const realNewCount = realInit.length;
     const newCount = realInit.length + fInit.length;
     const exCount  = realSuivi.length + fSuivi.length;
     const hasActivity = newCount > 0 || exCount > 0;
@@ -681,7 +677,7 @@ const projectionRows = computed(() => {
     const totalHT  = (hasActivity ? sub.value : 0) + initCost + suiviCost + pleiCost;
 
     rows.push({
-      year, total, newCount, exCount,
+      year, total, realNewCount, newCount, exCount,
       initCost, suiviCost, pleiCost, totalHT,
       tva: totalHT * 0.2, ttc: totalHT * 1.2,
       isSelected: year === startYear,
@@ -1557,7 +1553,6 @@ async function loadPricingFromDB() {
   annBufferM.value  = data.ann_buffer_m;
   annClusterM.value = data.ann_cluster_m;
   annConsolKm.value = data.ann_consol_km;
-  projPerYr.value   = data.proj_per_yr;
 }
 
 async function savePricingToDB() {
@@ -1579,7 +1574,6 @@ async function savePricingToDB() {
     ann_buffer_m:  annBufferM.value,
     ann_cluster_m: annClusterM.value,
     ann_consol_km: annConsolKm.value,
-    proj_per_yr:   projPerYr.value,
     updated_at:    new Date().toISOString()
   });
 }
@@ -1594,13 +1588,17 @@ function scheduleSavePricing() {
 watch(
   [sub, shpBase, shpScale, shpWH, shpMaxH, shpMaxML, shpProg,
    initRate, priceFloor, annDifficulty, annRate, annCloud,
-   annPadding, annBufferM, annClusterM, annConsolKm, projPerYr],
+   annPadding, annBufferM, annClusterM, annConsolKm],
   scheduleSavePricing
 );
 
 // ── Init ──────────────────────────────────────────────────────────────────
 onMounted(()=>{
-  setTimeout(()=>{ initShpMap(); loadProjectsFromDB(); loadPricingFromDB(); }, 120);
+  setTimeout(()=>{
+    if(suiviMode.value==='annuel') initAnnMap(); else initShpMap();
+    loadProjectsFromDB();
+    loadPricingFromDB();
+  }, 120);
 });
 </script>
 
