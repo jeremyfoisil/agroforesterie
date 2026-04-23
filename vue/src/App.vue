@@ -82,25 +82,16 @@
   ══════════════════════════════════════════════════════════════ -->
   <div>
     <!-- Year timeline -->
-    <div class="panel" style="margin-bottom:14px;padding:10px 14px">
-      <div style="display:flex;align-items:stretch;gap:6px">
-        <button class="timeline-nav-btn" @click="timelineJumpLeft"  :disabled="timelineOffset===0"              title="Aller à 2020">«</button>
-        <button class="timeline-nav-btn" @click="timelineScrollLeft" :disabled="timelineOffset===0"             title="Reculer">‹</button>
-        <div class="year-timeline" style="flex:1;min-width:0">
-          <div v-for="y in visibleYears" :key="y"
-               class="year-tile" :class="{'yt-selected': y === shpYear}"
-               @click="shpYear = y">
-            <div class="yt-year">{{ y }}</div>
-            <div class="yt-pills">
-              <span v-if="yearInitCountFor(y) > 0" class="yt-pill yt-init">{{ yearInitCountFor(y) }} init.</span>
-              <span v-if="yearSuiviCountFor(y) > 0" class="yt-pill yt-suivi">{{ yearSuiviCountFor(y) }} suivi</span>
-            </div>
-          </div>
-        </div>
-        <button class="timeline-nav-btn" @click="timelineScrollRight" :disabled="timelineOffset>=timelineMaxOffset" title="Avancer">›</button>
-        <button class="timeline-nav-btn" @click="timelineJumpRight"   :disabled="timelineOffset>=timelineMaxOffset" title="Aller à 2050">»</button>
-      </div>
-    </div>
+    <YearTimeline v-model="shpYear"
+                  :visible-years="visibleYears"
+                  :offset="timelineOffset"
+                  :max-offset="TIMELINE_MAX_OFFSET"
+                  :init-count-for="yearInitCountFor"
+                  :suivi-count-for="yearSuiviCountFor"
+                  @scroll-left="timelineScrollLeft"
+                  @scroll-right="timelineScrollRight"
+                  @jump-left="timelineJumpLeft"
+                  @jump-right="timelineJumpRight" />
 
     <!-- Mode toggle -->
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
@@ -452,107 +443,21 @@
 
 </div><!-- /container -->
 
-<!-- ── Color picker popup ────────────────────────────────────── -->
-<div v-if="colorPicker.open" class="cpop" :style="{top: colorPicker.top + 'px', left: colorPicker.left + 'px'}" @click.stop>
-  <div class="cpop-title">Couleur du projet</div>
-  <div class="cpop-swatches">
-    <div v-for="c in PALETTE" :key="c" class="cswatch"
-         :class="{active: colorPickerProj && c === colorPickerProj.color}"
-         :style="{background: c}" :title="c"
-         @click="applyProjColor(colorPicker.projId, c)"></div>
-  </div>
-  <div class="cpop-hex">
-    <input type="color" :value="colorPickerProj ? colorPickerProj.color : '#2d6a4f'"
-           @input="applyProjColor(colorPicker.projId, $event.target.value)">
-    <input type="text" :value="colorPickerProj ? colorPickerProj.color : ''"
-           maxlength="7" placeholder="#rrggbb"
-           @input="onCpHex(colorPicker.projId, $event.target.value)">
-  </div>
-</div>
+<ColorPickerPopup :state="colorPicker"
+                  :project="colorPickerProj"
+                  :palette="PALETTE"
+                  @pick="applyProjColor" />
 
-<!-- ── Password modal ────────────────────────────────────────── -->
-<div v-if="pwModal.open" class="pw-overlay" @click.self="pwModal.open=false">
-  <div class="pw-modal">
-    <div class="pw-modal-icon">🔒</div>
-    <div class="pw-modal-title">Accès protégé</div>
-    <div class="pw-modal-sub">Entrez le mot de passe pour accéder aux paramètres de tarification.</div>
-    <input class="pw-input" :class="{'pw-error': pwModal.error}" type="password"
-           v-model="pwModal.input" placeholder="••••••"
-           @keyup.enter="submitPassword" @input="pwModal.error=false" ref="pwInputRef">
-    <div class="pw-err-msg">{{ pwModal.error ? 'Mot de passe incorrect.' : '' }}</div>
-    <div class="pw-actions">
-      <button class="btn-cancel" @click="pwModal.open=false">Annuler</button>
-      <button class="btn-save"   @click="submitPassword">Déverrouiller</button>
-    </div>
-  </div>
-</div>
+<PasswordModal v-model="pwOpen"
+               :expected="SETTINGS_PASSWORD"
+               @unlock="onPasswordUnlock" />
 
-<!-- ── Edit project modal ─────────────────────────────────────── -->
-<div v-if="editModal.open" class="edit-modal-overlay" @click.self="closeEditModal">
-  <div class="edit-modal">
-    <div class="edit-modal-title">
-      Modifier le projet
-      <button class="edit-modal-close" @click="closeEditModal">×</button>
-    </div>
-
-    <div class="edit-field">
-      <label>Nom du projet</label>
-      <input type="text" v-model="editModal.form.name" placeholder="Nom du projet">
-    </div>
-
-    <div class="edit-field">
-      <label>Couleur</label>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
-        <div v-for="c in PALETTE" :key="c"
-             :style="{width:'20px',height:'20px',borderRadius:'50%',background:c,cursor:'pointer',
-                      border: editModal.form.color===c ? '2px solid transparent' : '2px solid transparent',
-                      outline: editModal.form.color===c ? '2px solid var(--dark)' : 'none',
-                      outlineOffset: '2px'}"
-             @click="editModal.form.color = c"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <input type="color" v-model="editModal.form.color" style="width:34px;height:32px;border:none;padding:2px;cursor:pointer;border-radius:6px;background:none">
-        <input type="text" v-model="editModal.form.color" maxlength="7" placeholder="#rrggbb"
-               style="width:100px;font-family:monospace;font-size:12px;padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:var(--r-sm)">
-        <div :style="{width:'28px',height:'28px',borderRadius:'50%',background:editModal.form.color,border:'2px solid var(--gray-200)',flexShrink:0}"></div>
-      </div>
-    </div>
-
-    <div class="edit-field">
-      <label>Nombre de haies</label>
-      <div class="read-only-val">{{ editModal.form.haiesCount }} haie{{ editModal.form.haiesCount > 1 ? 's' : '' }}</div>
-    </div>
-
-    <div class="edit-field">
-      <label>Linéaire de haies</label>
-      <div class="read-only-val">{{ fmtLen(editModal.form.totalLengthM) }}</div>
-    </div>
-
-    <div class="edit-field">
-      <label>Année d'initialisation</label>
-      <input type="number" v-model.number="editModal.form.annee" min="2000" max="2050" @change="onEditAnneeChange">
-    </div>
-
-    <div class="edit-field">
-      <label>Années de suivi</label>
-      <div style="font-size:11px;color:var(--gray-600);margin-bottom:6px">Sélectionnez les années de suivi triennal</div>
-      <div class="suivi-years-grid">
-        <label v-for="y in editModal.suiviYearOptions" :key="y"
-               class="suivi-year-chip" :class="{active: editModal.form.suiviYears.includes(y)}">
-          <input type="checkbox" style="display:none"
-                 :checked="editModal.form.suiviYears.includes(y)"
-                 @change="toggleEditSuiviYear(y)">
-          {{ y }}
-        </label>
-      </div>
-    </div>
-
-    <div class="edit-actions">
-      <button class="btn-cancel" @click="closeEditModal">Annuler</button>
-      <button class="btn-save" @click="saveEditModal">Enregistrer</button>
-    </div>
-  </div>
-</div>
+<EditProjectModal :state="editModal"
+                  :palette="PALETTE"
+                  @close="closeEditModal"
+                  @save="saveEditModal"
+                  @annee-change="onEditAnneeChange"
+                  @toggle-suivi="toggleEditSuiviYear" />
 
 <footer>Kermap — Simulateur de tarification « Suivi des projets d'agroforesterie » — {{ currentDate }}</footer>
 
@@ -560,149 +465,26 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue'
-import { createClient } from '@supabase/supabase-js'
 import Chart from 'chart.js/auto'
 import L from 'leaflet'
 import shp from 'shpjs'
-import * as turf from '@turf/turf'
 
-// ── Supabase ──────────────────────────────────────────────────────────────────
-const SUPA_URL = 'https://zxdrhyokvkoeokurqwef.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4ZHJoeW9rdmtvZW9rdXJxd2VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMzk1NjUsImV4cCI6MjA5MDcxNTU2NX0.uHgG8lAhd-OXUS5r37_qzQWEJeXHec1cFkSC0Md8C-Y';
-const supabaseClient = createClient(SUPA_URL, SUPA_KEY);
+import { supabase } from './lib/supabase.js'
+import {
+  SHP_COLORS, PALETTE,
+  ALL_YEARS, TIMELINE_VISIBLE, TIMELINE_MAX_OFFSET,
+  DEPT_STYLE_DARK, DEPT_STYLE_LIGHT
+} from './constants.js'
+import { fmt, fmtN, fmtLen, defaultSuiviYears } from './utils/format.js'
+import { computeShpPrice } from './utils/pricing.js'
+import { geomLength, calcOptimizedProjectAOIs, consolidateAOIs } from './utils/geo.js'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const SHP_COLORS = ['#e63946','#2a9d8f','#e9c46a','#f4a261','#264653','#6d6875','#457b9d','#588157'];
-const PALETTE = [
-  '#e63946','#c1121f','#ff6b6b','#ff9f1c','#f4a261','#e9c46a',
-  '#2a9d8f','#52b788','#95d5b2','#3a5a40','#588157','#264653',
-  '#457b9d','#1d3557','#023e8a','#0077b6','#6d6875','#b5838d',
-  '#7209b7','#3f37c9','#4361ee','#f77f00','#d62828','#333333'
-];
+import YearTimeline from './components/YearTimeline.vue'
+import PasswordModal from './components/PasswordModal.vue'
+import ColorPickerPopup from './components/ColorPickerPopup.vue'
+import EditProjectModal from './components/EditProjectModal.vue'
 
-// ── Pure utility functions ────────────────────────────────────────────────────
-function fmt(n) { return Math.round(n).toLocaleString('fr-FR') + ' €'; }
-function fmtN(n, d=0) { return n.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d}); }
-function fmtLen(m) {
-  if (m >= 1000) return (m / 1000).toLocaleString('fr-FR', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' km';
-  return Math.round(m).toLocaleString('fr-FR') + ' m';
-}
-
-function defaultSuiviYears(annee) {
-  return [annee + 3, annee + 6, annee + 9];
-}
-
-function computeShpPrice(haies, ml, p) {
-  const score = (x, max) => {
-    if (max <= 0) return 0;
-    if (p.prog === 'sqrt') return Math.min(Math.sqrt(x) / Math.sqrt(max), 1);
-    if (p.prog === 'lin')  return Math.min(x / max, 1);
-    return Math.min(Math.log(1 + x) / Math.log(1 + max), 1);
-  };
-  return p.base + (p.wH * score(haies, p.maxH) + p.wML * score(ml, p.maxML)) * p.scale;
-}
-
-function haversineM(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const p1 = lat1 * Math.PI/180, p2 = lat2 * Math.PI/180;
-  const dp = (lat2-lat1)*Math.PI/180, dl = (lon2-lon1)*Math.PI/180;
-  const a = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-function geomLength(geometry) {
-  if (!geometry) return 0;
-  const calcLine = coords => { let l=0; for (let i=1;i<coords.length;i++) l+=haversineM(coords[i-1][1],coords[i-1][0],coords[i][1],coords[i][0]); return l; };
-  if (geometry.type === 'LineString') return calcLine(geometry.coordinates);
-  if (geometry.type === 'MultiLineString') return geometry.coordinates.reduce((s,c) => s+calcLine(c), 0);
-  if (geometry.type === 'GeometryCollection') return geometry.geometries.reduce((s,g) => s+geomLength(g), 0);
-  return 0;
-}
-
-// ── Spatial / clustering functions ───────────────────────────────────────────
-function makeUnionFind(n) {
-  const p = Array.from({length:n},(_,i)=>i);
-  const find = i => { while(p[i]!==i){p[i]=p[p[i]];i=p[i];}return i;};
-  const union = (a,b) => {p[find(a)]=find(b);};
-  const groups = () => { const m={}; for(let i=0;i<n;i++){const r=find(i);if(!m[r])m[r]=[];m[r].push(i);}return Object.values(m);};
-  return {find,union,groups};
-}
-
-function getLineFeatures(proj) {
-  if (!proj.fc || !proj.fc.features) return [];
-  return proj.fc.features.filter(f=>f.geometry&&['LineString','MultiLineString'].includes(f.geometry.type));
-}
-
-function lineCentroid(f) {
-  const coords=[];
-  const g=f.geometry;
-  if(g.type==='LineString') g.coordinates.forEach(c=>coords.push(c));
-  else if(g.type==='MultiLineString') g.coordinates.forEach(l=>l.forEach(c=>coords.push(c)));
-  if(!coords.length) return null;
-  return [coords.reduce((s,c)=>s+c[0],0)/coords.length, coords.reduce((s,c)=>s+c[1],0)/coords.length];
-}
-
-function calcClusterHull(features, bufferKm) {
-  const allPts=[];
-  features.forEach(f=>{
-    if(!f.geometry) return;
-    try { const buf=turf.buffer(f,bufferKm,{units:'kilometers'}); if(buf) turf.coordAll(buf).forEach(c=>allPts.push(turf.point(c))); }
-    catch(e) {
-      const g=f.geometry;
-      if(g.type==='LineString') g.coordinates.forEach(c=>allPts.push(turf.point(c)));
-      else if(g.type==='MultiLineString') g.coordinates.forEach(l=>l.forEach(c=>allPts.push(turf.point(c))));
-    }
-  });
-  if(allPts.length<3) return null;
-  try { return turf.convex(turf.featureCollection(allPts))||null; } catch(e){return null;}
-}
-
-function calcOptimizedProjectAOIs(proj, bufferM, clusterM) {
-  const features=getLineFeatures(proj);
-  if(!features.length) return [];
-  const centroids=features.map(lineCentroid);
-  const uf=makeUnionFind(features.length);
-  for(let i=0;i<features.length;i++){
-    if(!centroids[i]) continue;
-    for(let j=i+1;j<features.length;j++){
-      if(!centroids[j]) continue;
-      if(haversineM(centroids[i][1],centroids[i][0],centroids[j][1],centroids[j][0])<=clusterM) uf.union(i,j);
-    }
-  }
-  const bufKm=bufferM/1000;
-  return uf.groups().map(indices=>{
-    const hull=calcClusterHull(indices.map(i=>features[i]),bufKm);
-    if(!hull) return null;
-    return {hull,area:turf.area(hull)/1e6,featureCount:indices.length};
-  }).filter(Boolean);
-}
-
-function consolidateAOIs(allProjectAOIs, consolKm) {
-  const flat=[];
-  allProjectAOIs.forEach(p=>p.aois.forEach(a=>flat.push({...a,projectId:p.projectId,projectName:p.projectName,color:p.color})));
-  const individualArea=flat.reduce((s,a)=>s+a.area,0);
-  if(!flat.length) return {groups:[],totalArea:0,individualArea:0};
-  const centroids=flat.map(a=>{try{return turf.centroid(a.hull).geometry.coordinates;}catch(e){return null;}});
-  const uf=makeUnionFind(flat.length);
-  for(let i=0;i<flat.length;i++){
-    if(!centroids[i]) continue;
-    for(let j=i+1;j<flat.length;j++){
-      if(!centroids[j]) continue;
-      if(haversineM(centroids[i][1],centroids[i][0],centroids[j][1],centroids[j][0])/1000<=consolKm) uf.union(i,j);
-    }
-  }
-  const groups=uf.groups().map(indices=>{
-    const items=indices.map(i=>flat[i]);
-    const projectIds=[...new Set(items.map(i=>i.projectId))];
-    const allPts=[];
-    items.forEach(item=>{try{turf.coordAll(item.hull).forEach(c=>allPts.push(turf.point(c)));}catch(e){}});
-    let mergedHull=null,mergedArea=0;
-    if(allPts.length>=3){try{mergedHull=turf.convex(turf.featureCollection(allPts));if(mergedHull)mergedArea=turf.area(mergedHull)/1e6;}catch(e){}}
-    if(!mergedArea) mergedArea=items.reduce((s,i)=>s+i.area,0);
-    return {items,projectIds,mergedHull,mergedArea,isMultiProject:projectIds.length>1};
-  });
-  return {groups,totalArea:groups.reduce((s,g)=>s+g.mergedArea,0),individualArea};
-}
+const SETTINGS_PASSWORD = import.meta.env.VITE_SETTINGS_PASSWORD || 'KerMap'
 
 // ── Tab / UI state ────────────────────────────────────────────────────────
 const activeTab      = ref('shp');
@@ -710,8 +492,7 @@ const suiviMode      = ref('triennal'); // 'triennal' | 'annuel'
 const evalSubTab     = ref('eval');     // 'eval' | 'projections'
 const settingsOpen     = ref(false);
 const settingsUnlocked = ref(false);
-const pwModal          = reactive({open:false, input:'', error:false});
-const pwInputRef       = ref(null);
+const pwOpen           = ref(false);
 const isDragOver     = ref(false);
 const fileInputEl    = ref(null);
 const threshold100Label = ref('⊞ Seuil 100 km² — optimiser les paramètres');
@@ -750,26 +531,19 @@ const shpProjects = ref([]);
 let shpNextId = 1;
 const selectedShpId = ref(null);
 
-// ── Year options — plage fixe 2020-2050 avec fenêtre glissante ───────────
-const ALL_YEARS        = Array.from({length: 31}, (_, i) => 2020 + i);
-const TIMELINE_VISIBLE = 8;
-const timelineMaxOffset = ALL_YEARS.length - TIMELINE_VISIBLE; // 23
-
 // Offset initial : curYear centré dans la fenêtre, borné à [0, maxOffset]
 const timelineOffset = ref(
-  Math.max(0, Math.min(curYear - 2020 - Math.floor(TIMELINE_VISIBLE / 2), timelineMaxOffset))
+  Math.max(0, Math.min(curYear - 2020 - Math.floor(TIMELINE_VISIBLE / 2), TIMELINE_MAX_OFFSET))
 );
 
 const visibleYears = computed(() =>
   ALL_YEARS.slice(timelineOffset.value, timelineOffset.value + TIMELINE_VISIBLE)
 );
-// yearOptions conservé pour les watchers (toutes les années)
-const yearOptions = ALL_YEARS;
 
 function timelineScrollLeft()  { timelineOffset.value = Math.max(0, timelineOffset.value - 1); }
-function timelineScrollRight() { timelineOffset.value = Math.min(timelineMaxOffset, timelineOffset.value + 1); }
+function timelineScrollRight() { timelineOffset.value = Math.min(TIMELINE_MAX_OFFSET, timelineOffset.value + 1); }
 function timelineJumpLeft()    { timelineOffset.value = 0; }
-function timelineJumpRight()   { timelineOffset.value = timelineMaxOffset; }
+function timelineJumpRight()   { timelineOffset.value = TIMELINE_MAX_OFFSET; }
 
 // ── Projection table ref (auto-scroll) ───────────────────────────────────
 const projTableRef = ref(null);
@@ -1016,30 +790,17 @@ async function applyProjColor(projId,color) {
       else if(l.setStyle) l.setStyle({color,fillColor:color});
     });
   }
-  if(proj.dbId) await supabaseClient.from('projets_agroforesterie').update({couleur:color}).eq('id',proj.dbId);
-}
-
-function onCpHex(projId,val) {
-  if(!val.startsWith('#')) val='#'+val;
-  if(/^#[0-9a-fA-F]{6}$/.test(val)) applyProjColor(projId,val);
+  if(proj.dbId) await supabase.from('projets_agroforesterie').update({couleur:color}).eq('id',proj.dbId);
 }
 
 // ── Settings password ─────────────────────────────────────────────────────
 function openSettings() {
   if (settingsUnlocked.value) { settingsOpen.value = !settingsOpen.value; return; }
-  pwModal.input = ''; pwModal.error = false; pwModal.open = true;
-  nextTick(() => pwInputRef.value && pwInputRef.value.focus());
+  pwOpen.value = true;
 }
-function submitPassword() {
-  if (pwModal.input === 'KerMap') {
-    settingsUnlocked.value = true;
-    pwModal.open = false;
-    settingsOpen.value = true;
-  } else {
-    pwModal.error = true;
-    pwModal.input = '';
-    nextTick(() => pwInputRef.value && pwInputRef.value.focus());
-  }
+function onPasswordUnlock() {
+  settingsUnlocked.value = true;
+  settingsOpen.value = true;
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────
@@ -1088,7 +849,7 @@ async function saveEditModal() {
     await applyProjColor(proj.id, editModal.form.color);
   }
   if (proj.dbId) {
-    await supabaseClient.from('projets_agroforesterie')
+    await supabase.from('projets_agroforesterie')
       .update({nom: proj.name, annee: proj.annee, suivi_years: proj.suiviYears})
       .eq('id', proj.dbId);
   }
@@ -1097,10 +858,6 @@ async function saveEditModal() {
 }
 
 // ── Map initialization ────────────────────────────────────────────────────
-
-// Styles des limites départementales selon le fond de carte
-const DEPT_STYLE_DARK  = {color:'#444', weight:0.9, opacity:0.50, fill:false};
-const DEPT_STYLE_LIGHT = {color:'#fff', weight:1.1, opacity:0.70, fill:false};
 
 // Cache partagé pour les données BD ORTHO (chargé une seule fois par session)
 let _deptOrthoData = null;
@@ -1148,7 +905,7 @@ async function addOrthoMillesimeOverlay(mapInst, layerCtrl) {
   ensureHatchPatterns(COLORS);
   try {
     if(!_deptOrthoData) {
-      const { data } = await supabaseClient.from('dept_ortho_disponibilites').select('*');
+      const { data } = await supabase.from('dept_ortho_disponibilites').select('*');
       _deptOrthoData = data || [];
     }
     const r = await fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson');
@@ -1408,7 +1165,7 @@ async function loadShpFile(file) {
     const suiviYears=defaultSuiviYears(annee);
     const proj={id:shpNextId++,name,haiesCount,totalLengthM,isNew:true,color,fc,dbId:null,annee,suiviYears};
     shpProjects.value.push(proj);
-    const {data,error}=await supabaseClient.from('projets_agroforesterie')
+    const {data,error}=await supabase.from('projets_agroforesterie')
       .insert({nom:name,haies_count:haiesCount,total_length_m:totalLengthM,is_new:true,couleur:color,geojson:fc,annee,suivi_years:suiviYears})
       .select().single();
     if(!error&&data) proj.dbId=data.id;
@@ -1423,7 +1180,7 @@ async function removeShpProject(id) {
   const idx=shpProjects.value.findIndex(p=>p.id===id);
   if(idx<0) return;
   const proj=shpProjects.value[idx];
-  if(proj.dbId) await supabaseClient.from('projets_agroforesterie').delete().eq('id',proj.dbId);
+  if(proj.dbId) await supabase.from('projets_agroforesterie').delete().eq('id',proj.dbId);
   if(proj._layer&&shpLayerGroupInst) shpLayerGroupInst.removeLayer(proj._layer);
   shpProjects.value.splice(idx,1);
   if(selectedShpId.value===id) selectedShpId.value=null;
@@ -1433,7 +1190,7 @@ async function toggleShpStatus(id) {
   const proj=shpProjects.value.find(p=>p.id===id);
   if(!proj) return;
   proj.isNew=!proj.isNew;
-  if(proj.dbId) await supabaseClient.from('projets_agroforesterie').update({is_new:proj.isNew}).eq('id',proj.dbId);
+  if(proj.dbId) await supabase.from('projets_agroforesterie').update({is_new:proj.isNew}).eq('id',proj.dbId);
 }
 
 function focusShpProject(id) {
@@ -1450,7 +1207,7 @@ function focusShpProject(id) {
 
 // ── Supabase: load from DB ────────────────────────────────────────────────
 async function loadProjectsFromDB() {
-  const {data,error}=await supabaseClient.from('projets_agroforesterie').select('*').order('created_at');
+  const {data,error}=await supabase.from('projets_agroforesterie').select('*').order('created_at');
   if(error){console.error('Supabase load error:',error);return;}
   if(!data||!data.length) return;
   for(const row of data){
@@ -1762,7 +1519,7 @@ watch([annPricing, annProjectAOIs], async ()=>{
 
 // ── Pricing params persistence ────────────────────────────────────────────
 async function loadPricingFromDB() {
-  const {data, error} = await supabaseClient
+  const {data, error} = await supabase
     .from('parametres_tarification').select('*').eq('id', 1).single();
   if (error || !data) return;
   sub.value         = data.sub;
@@ -1785,7 +1542,7 @@ async function loadPricingFromDB() {
 }
 
 async function savePricingToDB() {
-  await supabaseClient.from('parametres_tarification').upsert({
+  await supabase.from('parametres_tarification').upsert({
     id: 1,
     sub:           sub.value,
     shp_base:      shpBase.value,
