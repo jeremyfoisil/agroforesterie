@@ -1165,27 +1165,47 @@ async function handleShpFiles(files) {
 }
 
 async function loadShpFile(file) {
-  const name=file.name.replace(/\.zip$/i,'');
+  const zipName=file.name.replace(/\.zip$/i,'');
   try {
     const buffer=await file.arrayBuffer();
     const result=await shp(buffer);
     const fcs=Array.isArray(result)?result:[result];
-    const features=fcs.flatMap(fc=>(fc&&fc.features)?fc.features:[]);
-    const lineFeats=features.filter(f=>f.geometry&&['LineString','MultiLineString'].includes(f.geometry.type));
-    const haiesCount=lineFeats.length>0?lineFeats.length:features.length;
-    const totalLengthM=features.reduce((s,f)=>s+geomLength(f.geometry),0);
-    const fc={type:'FeatureCollection',features};
-    const color=SHP_COLORS[shpProjects.value.length%SHP_COLORS.length];
-    const yearInName = name.match(/(20\d{2})/)?.[1];
+    const allFeatures=fcs.flatMap(fc=>(fc&&fc.features)?fc.features:[]);
+
+    const yearInName = zipName.match(/(20\d{2})/)?.[1];
     const annee = yearInName ? parseInt(yearInName) : (shpYear.value || new Date().getFullYear());
-    const suiviYears=defaultSuiviYears(annee);
-    const proj={id:shpNextId++,name,haiesCount,totalLengthM,isNew:true,color,fc,dbId:null,annee,suiviYears};
-    shpProjects.value.push(proj);
-    const {data,error}=await supabase.from('projets_agroforesterie')
-      .insert({nom:name,haies_count:haiesCount,total_length_m:totalLengthM,is_new:true,couleur:color,geojson:fc,annee,suivi_years:suiviYears})
-      .select().single();
-    if(!error&&data) proj.dbId=data.id;
-    addShpToMap(proj);
+
+    // Group features by ID_PROJET if the field exists
+    const hasIdProjet = allFeatures.some(f=>f.properties?.ID_PROJET!=null);
+    const groups = new Map();
+    if(hasIdProjet) {
+      for(const f of allFeatures) {
+        const key = f.properties?.ID_PROJET ?? '__no_id__';
+        if(!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(f);
+      }
+    } else {
+      groups.set(zipName, allFeatures);
+    }
+
+    for(const [idProjet, features] of groups) {
+      const nom = hasIdProjet
+        ? (features[0]?.properties?.Nom_entrep || features[0]?.properties?.NOM_ENTREP || String(idProjet))
+        : zipName;
+      const lineFeats=features.filter(f=>f.geometry&&['LineString','MultiLineString'].includes(f.geometry.type));
+      const haiesCount=lineFeats.length>0?lineFeats.length:features.length;
+      const totalLengthM=features.reduce((s,f)=>s+geomLength(f.geometry),0);
+      const fc={type:'FeatureCollection',features};
+      const color=SHP_COLORS[shpProjects.value.length%SHP_COLORS.length];
+      const suiviYears=defaultSuiviYears(annee);
+      const proj={id:shpNextId++,name:nom,haiesCount,totalLengthM,isNew:true,color,fc,dbId:null,annee,suiviYears};
+      shpProjects.value.push(proj);
+      const {data,error}=await supabase.from('projets_agroforesterie')
+        .insert({nom,haies_count:haiesCount,total_length_m:totalLengthM,is_new:true,couleur:color,geojson:fc,annee,suivi_years:suiviYears})
+        .select().single();
+      if(!error&&data) proj.dbId=data.id;
+      addShpToMap(proj);
+    }
     updateShpMapStyles();
   }catch(e){
     alert('Erreur lors du chargement de « '+file.name+' » :\n'+e.message);
