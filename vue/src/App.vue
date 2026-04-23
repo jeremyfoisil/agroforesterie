@@ -1169,8 +1169,7 @@ async function loadShpFile(file) {
     const fcs=Array.isArray(result)?result:[result];
     const allFeatures=fcs.flatMap(fc=>(fc&&fc.features)?fc.features:[]);
 
-    const yearInName = zipName.match(/(20\d{2})/)?.[1];
-    const annee = yearInName ? parseInt(yearInName) : (shpYear.value || new Date().getFullYear());
+    const annee = shpYear.value || new Date().getFullYear();
 
     // Group features by ID_PROJET if the field exists
     const hasIdProjet = allFeatures.some(f=>f.properties?.ID_PROJET!=null);
@@ -1255,10 +1254,7 @@ async function loadProjectsFromDB() {
   if(error){console.error('Supabase load error:',error);return;}
   if(!data||!data.length) return;
   for(const row of data){
-    const yearInName = row.nom.match(/(20\d{2})/)?.[1];
-    const annee = yearInName ? parseInt(yearInName) : (row.annee||new Date().getFullYear());
-    if(yearInName && annee !== row.annee)
-      supabase.from('projets_agroforesterie').update({annee}).eq('id',row.id);
+    const annee = row.annee || new Date().getFullYear();
     const proj={id:shpNextId++,dbId:row.id,name:row.nom,haiesCount:row.haies_count,
       totalLengthM:row.total_length_m,isNew:row.is_new,color:row.couleur,fc:row.geojson,
       annee,suiviYears:row.suivi_years||[]};
