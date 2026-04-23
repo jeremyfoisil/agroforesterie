@@ -10,7 +10,7 @@ export const PALETTE = [
   '#7209b7', '#3f37c9', '#4361ee', '#f77f00', '#d62828', '#333333'
 ]
 
-export const ALL_YEARS = Array.from({ length: 31 }, (_, i) => 2020 + i)
+export const ALL_YEARS = Array.from({ length: 25 }, (_, i) => 2026 + i)
 export const TIMELINE_VISIBLE = 8
 export const TIMELINE_MAX_OFFSET = ALL_YEARS.length - TIMELINE_VISIBLE
 

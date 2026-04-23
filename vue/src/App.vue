@@ -527,7 +527,7 @@ const shpProjects = ref([]);
 let shpNextId = 1;
 const selectedShpId = ref(null);
 
-const timelineOffset = ref(Math.min(curYear - 2020, TIMELINE_MAX_OFFSET));
+const timelineOffset = ref(0);
 
 const visibleYears = computed(() =>
   ALL_YEARS.slice(timelineOffset.value, timelineOffset.value + TIMELINE_VISIBLE)
