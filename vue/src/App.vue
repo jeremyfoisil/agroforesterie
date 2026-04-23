@@ -96,8 +96,8 @@
     <!-- Mode toggle -->
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
       <div class="mode-toggle">
-        <button class="mode-btn" :class="{active: suiviMode==='triennal'}" @click="setSuiviMode('triennal')">Suivi triennal</button>
         <button class="mode-btn mode-btn-ann" :class="{active: suiviMode==='annuel'}" @click="setSuiviMode('annuel')">Suivi annuel (Pléiades)</button>
+        <button class="mode-btn" :class="{active: suiviMode==='triennal'}" @click="setSuiviMode('triennal')">Suivi triennal</button>
       </div>
       <span v-show="suiviMode==='annuel'" class="opt-banner annual" style="margin:0;padding:5px 14px">Estimation des commandes Pléiades Neo activée</span>
     </div>
@@ -488,7 +488,7 @@ const SETTINGS_PASSWORD = import.meta.env.VITE_SETTINGS_PASSWORD || 'KerMap'
 
 // ── Tab / UI state ────────────────────────────────────────────────────────
 const activeTab      = ref('shp');
-const suiviMode      = ref('triennal'); // 'triennal' | 'annuel'
+const suiviMode      = ref('annuel'); // 'annuel' | 'triennal'
 const evalSubTab     = ref('eval');     // 'eval' | 'projections'
 const settingsOpen     = ref(false);
 const settingsUnlocked = ref(false);
@@ -603,9 +603,13 @@ function isSuiviYear(p, year) {
   return (year - p.annee) % 3 === 0;
 }
 
-// Projects initialized before and whose follow-up falls in selected year
+// Projects in suivi for the selected year.
+// Annuel mode: all past projects are monitored every year.
+// Triennal mode: only every-3-year cycles.
 const yearSuiviOnes = computed(() =>
-  shpProjects.value.filter(p => isSuiviYear(p, shpYear.value))
+  suiviMode.value === 'annuel'
+    ? shpProjects.value.filter(p => p.annee < shpYear.value)
+    : shpProjects.value.filter(p => isSuiviYear(p, shpYear.value))
 );
 
 // All projects existing at or before selected year
@@ -1065,32 +1069,46 @@ function yearInitCountFor(y) {
   return shpProjects.value.filter(p => p.annee === y).length;
 }
 function yearSuiviCountFor(y) {
-  return shpProjects.value.filter(p => isSuiviYear(p, y)).length;
+  return suiviMode.value === 'annuel'
+    ? shpProjects.value.filter(p => p.annee < y).length
+    : shpProjects.value.filter(p => isSuiviYear(p, y)).length;
 }
 
 // ── Project card status helpers (driven by shpYear) ───────────────────────
 function projStatusLabel(p) {
-  if(p.annee===shpYear.value) return 'Initialisation';
-  if(p.annee<shpYear.value)   return 'Suivi';
+  if (p.annee === shpYear.value) return 'Initialisation';
+  if (p.annee < shpYear.value) {
+    const suivi = suiviMode.value === 'annuel' || isSuiviYear(p, shpYear.value);
+    return suivi ? 'Suivi' : 'Actif';
+  }
   return 'Prévu';
 }
 
 function projStatusClass(p) {
-  if(p.annee===shpYear.value) return 'new';
-  if(p.annee<shpYear.value)   return 'existing';
+  if (p.annee === shpYear.value) return 'new';
+  if (p.annee < shpYear.value) {
+    const suivi = suiviMode.value === 'annuel' || isSuiviYear(p, shpYear.value);
+    return suivi ? 'existing' : 'inter';
+  }
   return 'future';
 }
 
 function projYearCostColor(p) {
-  if(p.annee===shpYear.value) return 'var(--green)';
-  if(p.annee<shpYear.value) return isSuiviYear(p,shpYear.value) ? 'var(--gray-600)' : 'var(--gray-300,#b0bec5)';
+  if (p.annee === shpYear.value) return 'var(--green)';
+  if (p.annee < shpYear.value) {
+    const suivi = suiviMode.value === 'annuel' || isSuiviYear(p, shpYear.value);
+    return suivi ? 'var(--gray-600)' : 'var(--gray-300,#b0bec5)';
+  }
   return 'var(--blue)';
 }
 
 function projYearCostText(p) {
-  const price=computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-  if(p.annee===shpYear.value) return fmt(price);
-  if(p.annee<shpYear.value) return isSuiviYear(p,shpYear.value) ? fmt(price*0.5) : '—';
+  const price = computeShpPrice(p.haiesCount, p.totalLengthM, pp.value);
+  if (p.annee === shpYear.value) return fmt(price);
+  if (p.annee < shpYear.value) {
+    const suivi = suiviMode.value === 'annuel' || isSuiviYear(p, shpYear.value);
+    return suivi ? fmt(price * 0.5) : '—';
+  }
   return fmt(price);
 }
 
@@ -1161,7 +1179,8 @@ async function loadShpFile(file) {
     const totalLengthM=features.reduce((s,f)=>s+geomLength(f.geometry),0);
     const fc={type:'FeatureCollection',features};
     const color=SHP_COLORS[shpProjects.value.length%SHP_COLORS.length];
-    const annee=shpYear.value||new Date().getFullYear();
+    const yearInName = name.match(/\b(20\d{2})\b/)?.[1];
+    const annee = yearInName ? parseInt(yearInName) : (shpYear.value || new Date().getFullYear());
     const suiviYears=defaultSuiviYears(annee);
     const proj={id:shpNextId++,name,haiesCount,totalLengthM,isNew:true,color,fc,dbId:null,annee,suiviYears};
     shpProjects.value.push(proj);
@@ -1726,6 +1745,8 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
 .proj-status-btn.existing:hover{background:var(--gray-200);}
 .proj-status-btn.future{background:var(--blue-pale);color:var(--blue);}
 .proj-status-btn.future:hover{background:#bbdefb;}
+.proj-status-btn.inter{background:#fff8e1;color:#f57f17;}
+.proj-status-btn.inter:hover{background:#fff3cd;}
 .del-btn{background:none;border:none;color:#ccc;cursor:pointer;font-size:15px;line-height:1;padding:0 3px;}
 .del-btn:hover{color:#e53935;}
 .proj-empty{padding:20px;text-align:center;font-size:12px;color:var(--gray-600);}
