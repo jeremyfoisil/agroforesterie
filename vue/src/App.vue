@@ -126,26 +126,46 @@
           </div>
 
           <!-- Project list -->
-          <div style="margin-top:12px">
+          <div style="margin-top:10px">
+            <!-- Search -->
+            <div v-if="shpProjects.length" style="display:flex;align-items:center;gap:4px;margin-bottom:8px">
+              <input v-model="projSearch" type="text" placeholder="Rechercher un projet…"
+                     style="flex:1;font-size:12px;padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:var(--r-sm);outline:none;color:var(--gray-800);background:#fff"
+                     @focus="$event.target.style.borderColor='var(--green)'"
+                     @blur="$event.target.style.borderColor='var(--gray-200)'">
+              <button v-if="projSearch" @click="projSearch=''" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:15px;line-height:1;padding:0 4px">×</button>
+            </div>
+
             <div v-if="!shpProjects.length" class="proj-empty">Aucun projet chargé. Déposez des fichiers shapefile (.zip).</div>
-            <div v-for="p in shpProjects" :key="p.id"
-                 class="shp-proj-card" :class="{selected: p.id === selectedShpId}"
-                 @click="focusShpProject(p.id)">
-              <button class="edit-btn" data-tip="Modifier" @click.stop="openEditModal(p.id)"><span>✏</span></button>
-              <div class="shp-color-dot" :style="{background: p.color}" title="Changer la couleur"
-                   @click.stop="openColorPicker(p.id, $event)"></div>
-              <div class="shp-proj-info">
-                <div class="shp-proj-name" :title="p.name">{{ p.name }}</div>
-                <div class="shp-proj-meta">{{ p.haiesCount }} haie{{ p.haiesCount > 1 ? 's' : '' }} · {{ fmtLen(p.totalLengthM) }} · Init. {{ p.annee }}</div>
+            <div v-else-if="filteredGroupedProjects.length === 0" class="proj-empty">Aucun projet ne correspond à « {{ projSearch }} ».</div>
+
+            <template v-for="group in filteredGroupedProjects" :key="group.status">
+              <div class="status-group-header" @click="toggleStatusGroup(group.status)">
+                <span style="font-size:10px;color:var(--gray-400);width:10px">{{ collapsedGroups[group.status] ? '▶' : '▼' }}</span>
+                <span class="proj-status-btn" :class="group.statusClass" style="cursor:default">{{ group.status }}</span>
+                <span style="font-size:11px;color:var(--gray-500);margin-left:2px">{{ group.projects.length }}</span>
               </div>
-              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;min-width:96px">
-                <span class="proj-status-btn" :class="projStatusClass(p)" style="cursor:default">{{ projStatusLabel(p) }}</span>
-                <div style="font-size:12px;font-weight:700;white-space:nowrap" :style="{color: projYearCostColor(p)}">
-                  {{ projYearCostText(p) }}
+              <div v-show="!collapsedGroups[group.status]">
+                <div v-for="p in group.projects" :key="p.id" :id="`proj-card-${p.id}`"
+                     class="shp-proj-card" :class="{selected: p.id === selectedShpId}"
+                     @click="focusShpProject(p.id)">
+                  <button class="edit-btn" data-tip="Modifier" @click.stop="openEditModal(p.id)"><span>✏</span></button>
+                  <div class="shp-color-dot" :style="{background: p.color}" title="Changer la couleur"
+                       @click.stop="openColorPicker(p.id, $event)"></div>
+                  <div class="shp-proj-info">
+                    <div class="shp-proj-name" :title="p.name">{{ p.name }}</div>
+                    <div class="shp-proj-meta">{{ p.haiesCount }} haie{{ p.haiesCount > 1 ? 's' : '' }} · {{ fmtLen(p.totalLengthM) }} · Init. {{ p.annee }}</div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;min-width:96px">
+                    <span class="proj-status-btn" :class="projStatusClass(p)" style="cursor:default">{{ projStatusLabel(p) }}</span>
+                    <div style="font-size:12px;font-weight:700;white-space:nowrap" :style="{color: projYearCostColor(p)}">
+                      {{ projYearCostText(p) }}
+                    </div>
+                  </div>
+                  <button class="del-btn" data-tip="Supprimer" @click.stop="removeShpProject(p.id)">×</button>
                 </div>
               </div>
-              <button class="del-btn" data-tip="Supprimer" @click.stop="removeShpProject(p.id)">×</button>
-            </div>
+            </template>
           </div>
 
           <!-- Footer stats -->
@@ -526,6 +546,8 @@ const currentDate= new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'
 const shpProjects = ref([]);
 let shpNextId = 1;
 const selectedShpId = ref(null);
+const projSearch = ref('');
+const collapsedGroups = reactive({});
 
 const timelineOffset = ref(0);
 
@@ -631,9 +653,11 @@ const projectionRows = computed(() => {
     ? shpProjects.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0) / shpProjects.value.length
     : computeShpPrice(10, 5000, pp.value);
 
-  // Coût Pléiades projeté : plancher 3 500 € → plafond 8 000 € à ×20 projets actifs
-  // Coût Pléiades projeté : plancher 3 500 € → plafond 8 000 € à 100 projets actifs
-  const PLEI_MIN = 3500, PLEI_MAX = 8000, PLEI_SCALE = 100;
+  const PLEI_FLOOR = 3500, MIN_KM2 = 100;
+  // Aire moyenne par projet d'après les données réelles chargées
+  const totalRealArea = annProjectAOIs.value.reduce((s,p)=>s+p.aois.reduce((ss,a)=>ss+a.area,0),0);
+  const avgAreaPerProj = shpProjects.value.length > 0 ? totalRealArea / shpProjects.value.length : 0;
+  const pleiRate = annEffRate.value, pleiPad = annPadding.value;
 
   const forecasts = []; // { annee, price } — projets simulés
   const rows = [];
@@ -668,8 +692,9 @@ const projectionRows = computed(() => {
     const hasActivity = newCount > 0 || exCount > 0;
 
     const activeCount = newCount + exCount;
+    const estArea = activeCount * avgAreaPerProj * pleiPad;
     const pleiCost = isAnnuel && hasActivity
-      ? Math.min(PLEI_MAX, Math.max(PLEI_MIN, PLEI_MIN + (activeCount - 1) * (PLEI_MAX - PLEI_MIN) / (PLEI_SCALE - 1)))
+      ? (estArea < MIN_KM2 ? PLEI_FLOOR : estArea * pleiRate)
       : 0;
     const totalHT  = (hasActivity ? sub.value : 0) + initCost + suiviCost + pleiCost;
 
@@ -1010,11 +1035,10 @@ function addShpToMap(proj) {
   if(!shpMapInst||!shpLayerGroupInst) return;
   const layer=L.geoJSON(proj.fc,{
     style:{color:proj.color,weight:3,opacity:0.85},
-    pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:4,fillColor:proj.color,color:'#fff',weight:1,fillOpacity:0.8})
-  });
-  layer.bindPopup(f=>{
-    const len=geomLength(f.feature.geometry);
-    return '<strong>'+proj.name+'</strong>'+(len>0?'<br>Longueur : '+fmtLen(len):'');
+    pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:4,fillColor:proj.color,color:'#fff',weight:1,fillOpacity:0.8}),
+    onEachFeature:(f,fl)=>{
+      fl.bindPopup('<strong>'+proj.name+'</strong>'+(geomLength(f.geometry)>0?'<br>Longueur : '+fmtLen(geomLength(f.geometry)):''));
+    }
   });
   layer.addTo(shpLayerGroupInst);
   proj._layer=layer;
@@ -1085,6 +1109,41 @@ function projStatusClass(p) {
   return 'future';
 }
 
+const STATUS_ORDER = ['Initialisation', 'Suivi', 'Actif', 'Prévu'];
+
+const filteredGroupedProjects = computed(() => {
+  const q = projSearch.value.trim().toLowerCase();
+  const projs = q
+    ? shpProjects.value.filter(p => p.name.toLowerCase().includes(q))
+    : shpProjects.value;
+  const groups = {};
+  projs.forEach(p => {
+    const status = projStatusLabel(p);
+    const cls = projStatusClass(p);
+    if (!groups[status]) groups[status] = { status, statusClass: cls, projects: [] };
+    groups[status].projects.push(p);
+  });
+  return STATUS_ORDER.filter(s => groups[s]).map(s => groups[s]);
+});
+
+function toggleStatusGroup(status) {
+  collapsedGroups[status] = !collapsedGroups[status];
+}
+
+let _highlightClearTimer = null;
+function highlightProjectCard(id) {
+  clearTimeout(_highlightClearTimer);
+  selectedShpId.value = id;
+  nextTick(() => {
+    const el = document.getElementById(`proj-card-${id}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+
+function clearProjectHighlight() {
+  _highlightClearTimer = setTimeout(() => { selectedShpId.value = null; }, 80);
+}
+
 function projYearCostColor(p) {
   if (p.annee === shpYear.value) return 'var(--green)';
   if (p.annee < shpYear.value) {
@@ -1110,28 +1169,35 @@ function updateAnnMap() {
   const aois=annProjectAOIsYear.value;
   const consol=annConsolidationYear.value;
 
-  annYearProjects.value.forEach(proj=>{
-    if(!proj.fc) return;
-    L.geoJSON(proj.fc,{
-      style:{color:proj.color,weight:2,opacity:0.55},
-      pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:3,fillColor:proj.color,color:'#fff',weight:1,fillOpacity:0.7})
-    }).addTo(annLayerGroupInst);
-  });
-
-  aois.forEach(projData=>{
-    projData.aois.forEach((aoi,idx)=>{
-      if(!aoi.hull) return;
-      L.geoJSON(aoi.hull,{style:{color:projData.color,weight:1.5,opacity:0.9,fillColor:projData.color,fillOpacity:0.10,dashArray:'5 4'}})
-       .bindPopup('<strong>'+projData.projectName+'</strong> — AOI '+(idx+1)+'<br>'+aoi.featureCount+' haie'+(aoi.featureCount>1?'s':'')+' · '+aoi.area.toLocaleString('fr-FR',{maximumFractionDigits:2})+' km²')
-       .addTo(annLayerGroupInst);
-    });
-  });
-
+  // Mutualisées en premier (arrière-plan, clics non prioritaires)
   consol.groups.forEach(group=>{
     if(!group.mergedHull||!group.isMultiProject) return;
     L.geoJSON(group.mergedHull,{style:{color:'#1565c0',weight:2.5,opacity:0.85,fillColor:'#1565c0',fillOpacity:0.13,dashArray:'9 5'}})
      .bindPopup('<strong>Acquisition mutualisée</strong><br>'+group.projectIds.length+' projets · '+group.mergedArea.toLocaleString('fr-FR',{maximumFractionDigits:2})+' km²')
      .addTo(annLayerGroupInst);
+  });
+
+  // AOI hulls au milieu
+  aois.forEach(projData=>{
+    projData.aois.forEach((aoi,idx)=>{
+      if(!aoi.hull) return;
+      const aoiPopupContent='<strong>'+projData.projectName+'</strong> — AOI '+(idx+1)+'<br>'+aoi.featureCount+' haie'+(aoi.featureCount>1?'s':'')+' · '+fmtLen(aoi.totalLengthM)+' · '+aoi.area.toLocaleString('fr-FR',{maximumFractionDigits:2})+' km²';
+      const aoiLayer=L.geoJSON(aoi.hull,{style:{color:projData.color,weight:1.5,opacity:0.9,fillColor:projData.color,fillOpacity:0.10,dashArray:'5 4'}});
+      aoiLayer.on('mouseover',e=>L.popup({closeButton:false,className:'aoi-hover-popup'}).setLatLng(e.latlng).setContent(aoiPopupContent).openOn(annMapInst));
+      aoiLayer.on('mouseout',()=>annMapInst.closePopup());
+      aoiLayer.on('click',()=>{annMapInst.closePopup();focusShpProject(projData.projectId);nextTick(()=>{const el=document.getElementById('proj-card-'+projData.projectId);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});});});
+      aoiLayer.addTo(annLayerGroupInst);
+    });
+  });
+
+  // Haies au premier plan (clics prioritaires → highlight projet)
+  annYearProjects.value.forEach(proj=>{
+    if(!proj.fc) return;
+    const haieLayer=L.geoJSON(proj.fc,{
+      style:{color:proj.color,weight:2,opacity:0.55},
+      pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:3,fillColor:proj.color,color:'#fff',weight:1,fillOpacity:0.7})
+    });
+    haieLayer.addTo(annLayerGroupInst);
   });
 
   const layers=annLayerGroupInst.getLayers().filter(l=>typeof l.getBounds==='function');
@@ -1706,6 +1772,8 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
 /* Shapefile tab */
 .shp-dropzone{border:2px dashed var(--gray-200);border-radius:var(--r-sm);padding:22px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;font-size:13px;color:var(--gray-600);}
 .shp-dropzone:hover,.shp-dropzone.drag-over{border-color:var(--green);background:var(--green-pale);color:var(--green);}
+.status-group-header{display:flex;align-items:center;gap:6px;padding:4px 4px;margin-top:4px;cursor:pointer;user-select:none;border-radius:var(--r-sm);background:var(--gray-50);}
+.status-group-header:hover{background:var(--gray-100);}
 .shp-proj-card{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--gray-100);cursor:pointer;border-radius:var(--r-sm);transition:background .1s;}
 .shp-proj-card:hover{background:var(--gray-50);}
 .shp-proj-card.selected{background:var(--green-pale);border-left:3px solid var(--green);padding-left:6px;}
