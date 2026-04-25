@@ -102,7 +102,8 @@ export function calcOptimizedProjectAOIs(proj, bufferM, clusterM) {
   return uf.groups().map(indices => {
     const hull = calcClusterHull(indices.map(i => features[i]), bufKm)
     if (!hull) return null
-    return { hull, area: turf.area(hull) / 1e6, featureCount: indices.length }
+    const totalLengthM = indices.reduce((s, i) => s + geomLength(features[i].geometry), 0)
+    return { hull, area: turf.area(hull) / 1e6, featureCount: indices.length, totalLengthM }
   }).filter(Boolean)
 }
 
