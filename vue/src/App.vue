@@ -395,9 +395,9 @@
                 <div class="chart-wrap" style="height:160px"><canvas id="ann-donut-chart"></canvas></div>
                 <div v-if="annHasAreaYear">
                   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:16px 0 6px">Surface imagée par projet (km²)</div>
-                  <div class="chart-wrap" :style="{height: Math.max(60, shpProjects.length * 32) + 'px'}"><canvas id="ann-bar-area"></canvas></div>
-                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:16px 0 6px">Coût Pléiades par projet (€)</div>
-                  <div class="chart-wrap" :style="{height: Math.max(60, shpProjects.length * 32) + 'px'}"><canvas id="ann-bar-plei"></canvas></div>
+                  <div class="chart-wrap" :style="{height: Math.max(40, annYearProjects.length * 22) + 'px'}"><canvas id="ann-bar-area"></canvas></div>
+                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:16px 0 6px">Coût théorique Pléiades par projet (€)</div>
+                  <div class="chart-wrap" :style="{height: Math.max(40, annYearProjects.length * 22) + 'px'}"><canvas id="ann-bar-plei"></canvas></div>
                 </div>
               </div>
 
@@ -1580,8 +1580,8 @@ function updateAnnCharts(){
       const aLabels=perProjArea.map(p=>p.name),aColors=perProjArea.map(p=>p.color),aData=perProjArea.map(p=>parseFloat(p.area.toFixed(3)));
       if(annAreaInst){annAreaInst.data.labels=aLabels;annAreaInst.data.datasets[0].data=aData;annAreaInst.data.datasets[0].backgroundColor=aColors;annAreaInst.update();}
       else {
-        annAreaInst=new Chart(aCtx,{type:'bar',data:{labels:aLabels,datasets:[{label:'km²',data:aData,backgroundColor:aColors,borderRadius:4,borderSkipped:false}]},
-          options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.toLocaleString('fr-FR')} km²`}}},
+        annAreaInst=new Chart(aCtx,{type:'bar',data:{labels:aLabels,datasets:[{label:'km²',data:aData,backgroundColor:aColors,borderRadius:4,borderSkipped:false,barThickness:6}]},
+          options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{top:4,bottom:4}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.toLocaleString('fr-FR')} km²`}}},
             scales:{x:{ticks:{callback:v=>v+' km²',font:{size:10}}},y:{ticks:{font:{size:11}}}}}});
       }
     }
@@ -1591,8 +1591,8 @@ function updateAnnCharts(){
       const pData=perProjArea.map(p=>Math.round(p.area*annEffRate.value*annPadding.value));
       if(annPleiInst){annPleiInst.data.labels=aLabels;annPleiInst.data.datasets[0].data=pData;annPleiInst.data.datasets[0].backgroundColor=aColors;annPleiInst.update();}
       else {
-        annPleiInst=new Chart(pCtx,{type:'bar',data:{labels:aLabels,datasets:[{label:'€',data:pData,backgroundColor:aColors,borderRadius:4,borderSkipped:false}]},
-          options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Math.round(c.raw).toLocaleString('fr-FR')} €`}}},
+        annPleiInst=new Chart(pCtx,{type:'bar',data:{labels:aLabels,datasets:[{label:'€',data:pData,backgroundColor:aColors,borderRadius:4,borderSkipped:false,barThickness:6}]},
+          options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{top:4,bottom:4}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Math.round(c.raw).toLocaleString('fr-FR')} €`}}},
             scales:{x:{ticks:{callback:v=>v.toLocaleString('fr-FR')+' €',font:{size:10}}},y:{ticks:{font:{size:11}}}}}});
       }
     }
