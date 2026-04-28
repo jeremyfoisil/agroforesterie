@@ -653,7 +653,7 @@ const projectionRows = computed(() => {
     ? shpProjects.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0) / shpProjects.value.length
     : computeShpPrice(10, 5000, pp.value);
 
-  const PLEI_FLOOR = 3500, MIN_KM2 = 100;
+  const MIN_KM2 = 100;
   // Aire moyenne par projet d'après les données réelles chargées
   const totalRealArea = annProjectAOIs.value.reduce((s,p)=>s+p.aois.reduce((ss,a)=>ss+a.area,0),0);
   const avgAreaPerProj = shpProjects.value.length > 0 ? totalRealArea / shpProjects.value.length : 0;
@@ -694,7 +694,7 @@ const projectionRows = computed(() => {
     const activeCount = newCount + exCount;
     const estArea = activeCount * avgAreaPerProj * pleiPad;
     const pleiCost = isAnnuel && hasActivity
-      ? (estArea < MIN_KM2 ? PLEI_FLOOR : estArea * pleiRate)
+      ? (estArea < MIN_KM2 ? MIN_KM2 * pleiRate : estArea * pleiRate)
       : 0;
     const totalHT  = (hasActivity ? sub.value : 0) + initCost + suiviCost + pleiCost;
 
@@ -736,13 +736,13 @@ const annTotalAOIsYear     = computed(() => annProjectAOIsYear.value.reduce((s,p
 const annHasAreaYear       = computed(() => annProjectAOIsYear.value.some(p=>p.aois.some(a=>a.area>0)));
 
 const annPricing = computed(()=>{
-  const MIN_KM2=100, PLEI_FLOOR=3500;
+  const MIN_KM2=100;
   const rate=annEffRate.value, pad=annPadding.value;
   // Surface Pléiades calculée sur les projets actifs de l'année uniquement
   const rawAreaInd =annConsolidationYear.value.individualArea*pad;
   const rawAreaCons=annConsolidationYear.value.totalArea*pad;
-  const pleiCostInd  =rawAreaInd  <MIN_KM2?PLEI_FLOOR:rawAreaInd  *rate;
-  const pleiCostCons =rawAreaCons<MIN_KM2?PLEI_FLOOR:rawAreaCons*rate;
+  const pleiCostInd  =rawAreaInd  <MIN_KM2?MIN_KM2*rate:rawAreaInd  *rate;
+  const pleiCostCons =rawAreaCons<MIN_KM2?MIN_KM2*rate:rawAreaCons*rate;
   const savings=pleiCostInd-pleiCostCons;
   const pleiCost=Math.min(pleiCostInd,pleiCostCons);
   const pleiArea=rawAreaCons<MIN_KM2?rawAreaInd:(pleiCost===pleiCostCons?rawAreaCons:rawAreaInd);
@@ -770,7 +770,9 @@ function annProjMonCost(p) {
 }
 
 function fmtKm2Compare(raw,eff) {
-  return raw.toLocaleString('fr-FR',{maximumFractionDigits:2})+' km²'+(raw<100?' → <strong>100 km²</strong> min.':'')+' — '+fmt(eff*annEffRate.value);
+  const rate=annEffRate.value;
+  const cost=raw<100?100*rate:eff*rate;
+  return raw.toLocaleString('fr-FR',{maximumFractionDigits:2})+' km²'+(raw<100?' → <strong>100 km²</strong> min.':'')+' — '+fmt(cost);
 }
 
 // ── Color picker helpers ──────────────────────────────────────────────────
