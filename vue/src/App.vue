@@ -23,10 +23,14 @@
       <button class="sp-close" @click="settingsOpen = false">×</button>
     </div>
     <div class="sp-body">
-      <div class="sec-div">Abonnement plateforme</div>
+      <div class="sec-div">Abonnement annuel au service</div>
       <div class="fgroup">
         <div class="flabel"><span>Abonnement annuel (€ HT)</span></div>
         <div class="irow"><input type="number" min="500" max="20000" step="100" v-model.number="sub" style="width:90px"><span>€/an</span></div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel"><span>Marge Earthworm</span></div>
+        <div class="irow"><input type="number" min="0" max="200" step="1" v-model.number="ewMargin" style="width:80px"><span>% appliqué au tarif d'initialisation</span></div>
       </div>
 
       <div class="sec-div" style="margin-top:18px">Modèle prix — Projets Shapefiles</div>
@@ -143,6 +147,11 @@
                 <span style="font-size:10px;color:var(--gray-400);width:10px">{{ collapsedGroups[group.status] ? '▶' : '▼' }}</span>
                 <span class="proj-status-btn" :class="group.statusClass" style="cursor:default">{{ group.status }}</span>
                 <span style="font-size:11px;color:var(--gray-500);margin-left:2px">{{ group.projects.length }}</span>
+                <button v-if="group.status === 'Initialisation'"
+                        class="group-del-btn" data-tip="Supprimer tous les projets en initialisation"
+                        @click.stop="confirmRemoveGroup(group)">
+                  Tout supprimer
+                </button>
               </div>
               <div v-show="!collapsedGroups[group.status]">
                 <div v-for="p in group.projects" :key="p.id" :id="`proj-card-${p.id}`"
@@ -182,23 +191,30 @@
         <div class="panel" style="margin-top:18px">
           <div class="panel-title">AOIs Pléiades <span class="proj-counter" v-if="shpProjects.length">({{ shpProjects.length }})</span></div>
           <div v-if="!annYearProjects.length" class="proj-empty">Aucun projet actif pour {{ shpYear }}. Chargez des projets ou changez l'année.</div>
-          <div v-else>
-            <div v-for="p in annYearProjects" :key="p.id" class="shp-proj-card" style="cursor:default">
-              <div class="shp-color-dot" :style="{background: p.color}" style="pointer-events:none"></div>
-              <div class="shp-proj-info">
-                <div class="shp-proj-name" :title="p.name">{{ p.name }}</div>
-                <div class="shp-proj-meta">
-                  {{ p.haiesCount }} haie{{ p.haiesCount > 1 ? 's' : '' }}
-                  · {{ annProjInfo(p).nClusters }} AOI{{ annProjInfo(p).nClusters > 1 ? 's' : '' }}
-                  <span v-if="annProjInfo(p).area > 0"> · {{ annProjInfo(p).area.toLocaleString('fr-FR', {maximumFractionDigits:2}) }} km²</span>
+          <template v-else v-for="group in groupedAnnYearProjects" :key="group.status">
+            <div class="status-group-header" @click="toggleAOIGroup(group.status)">
+              <span style="font-size:10px;color:var(--gray-400);width:10px">{{ collapsedAOIGroups[group.status] ? '▶' : '▼' }}</span>
+              <span class="proj-status-btn" :class="group.statusClass" style="cursor:default">{{ group.status }}</span>
+              <span style="font-size:11px;color:var(--gray-500);margin-left:2px">{{ group.projects.length }}</span>
+            </div>
+            <div v-show="!collapsedAOIGroups[group.status]">
+              <div v-for="p in group.projects" :key="p.id" class="shp-proj-card" style="cursor:default">
+                <div class="shp-color-dot" :style="{background: p.color}" style="pointer-events:none"></div>
+                <div class="shp-proj-info">
+                  <div class="shp-proj-name" :title="p.name">{{ p.name }}</div>
+                  <div class="shp-proj-meta">
+                    {{ p.haiesCount }} haie{{ p.haiesCount > 1 ? 's' : '' }}
+                    · {{ annProjInfo(p).nClusters }} AOI{{ annProjInfo(p).nClusters > 1 ? 's' : '' }}
+                    <span v-if="annProjInfo(p).area > 0"> · {{ annProjInfo(p).area.toLocaleString('fr-FR', {maximumFractionDigits:2}) }} km²</span>
+                  </div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                  <div style="font-size:12px;font-weight:700;color:var(--green)">{{ fmt(annProjMonCost(p)) }}</div>
+                  <div v-if="annProjInfo(p).area > 0" style="font-size:11px;color:var(--blue)">{{ fmt(annProjInfo(p).area * annEffRate * annPadding) }} Pléiades</div>
                 </div>
               </div>
-              <div style="text-align:right;flex-shrink:0">
-                <div style="font-size:12px;font-weight:700;color:var(--green)">{{ fmt(annProjMonCost(p)) }}</div>
-                <div v-if="annProjInfo(p).area > 0" style="font-size:11px;color:var(--blue)">{{ fmt(annProjInfo(p).area * annEffRate * annPadding) }} Pléiades</div>
-              </div>
             </div>
-          </div>
+          </template>
           <div v-if="annYearProjects.length" class="shp-stats-footer">
             <span>{{ annYearProjects.length }} projet{{ annYearProjects.length > 1 ? 's' : '' }}</span>
             <span style="color:var(--gray-200)">|</span>
@@ -297,7 +313,7 @@
                   </div>
                 </div>
                 <div class="brow">
-                  <span class="blabel">Abonnement plateforme</span>
+                  <span class="blabel">Abonnement annuel au service</span>
                   <span class="bamount">{{ fmt(sub) }}</span>
                 </div>
                 <div class="brow">
@@ -468,6 +484,11 @@ const shpProg   = ref('log');
 const suiviFreq = ref(parseInt(localStorage.getItem('suiviFreq') || '1', 10) || 1);
 watch(suiviFreq, v => localStorage.setItem('suiviFreq', String(v)));
 
+// ── Marge Earthworm (% appliqué sur le tarif d'initialisation) ────────────
+const ewMargin = ref(parseFloat(localStorage.getItem('ewMargin') || '0') || 0);
+watch(ewMargin, v => localStorage.setItem('ewMargin', String(v)));
+const ewMarginFactor = computed(() => 1 + Math.max(0, ewMargin.value) / 100);
+
 // ── Annual tab params ─────────────────────────────────────────────────────
 const annDifficulty = ref('easy');
 const annRate       = ref(35);
@@ -497,6 +518,7 @@ let shpNextId = 1;
 const selectedShpId = ref(null);
 const projSearch = ref('');
 const collapsedGroups = reactive({});
+const collapsedAOIGroups = reactive({});
 
 const timelineOffset = ref(0);
 
@@ -566,7 +588,7 @@ const yearVisibleProjects = computed(() =>
 
 // Year-filtered costs (actual billing for selected year, not amortized)
 const shpInitCostYear = computed(() =>
-  yearNewOnes.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0)
+  yearNewOnes.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0) * ewMarginFactor.value
 );
 const shpSuiviCostYear = computed(() =>
   yearSuiviOnes.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value) * 0.5, 0)
@@ -607,8 +629,8 @@ const projectionRows = computed(() => {
     const fInit  = forecasts.filter(p => p.annee === year);
     const fSuivi = forecasts.filter(p => p.annee < year && (year - p.annee) % N === 0);
 
-    const initCost  = realInit.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0)
-                    + fInit.reduce((s, p) => s + p.price, 0);
+    const initCost  = (realInit.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0)
+                    + fInit.reduce((s, p) => s + p.price, 0)) * ewMarginFactor.value;
     const suiviCost = realSuivi.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value) * 0.5, 0)
                     + fSuivi.reduce((s, p) => s + p.price * 0.5, 0);
 
@@ -675,7 +697,7 @@ const annPricing = computed(()=>{
   const pleiCost=Math.min(pleiCostInd,pleiCostCons);
   const pleiArea=rawAreaCons<MIN_KM2?rawAreaInd:(pleiCost===pleiCostCons?rawAreaCons:rawAreaInd);
   // Coûts monitoring filtrés par année (init et suivi N+3)
-  const initCost =yearNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0);
+  const initCost =yearNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0)*ewMarginFactor.value;
   const suiviCost=yearSuiviOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*0.5,0);
   const hasActivity=yearNewOnes.value.length>0||yearSuiviOnes.value.length>0;
   const totalHT=(hasActivity?sub.value:0)+initCost+suiviCost+pleiCost;
@@ -694,7 +716,7 @@ function annProjInfo(p) {
 function annProjMonCost(p) {
   const price=computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
   const isInit=yearNewOnes.value.some(x=>x.id===p.id);
-  return isInit?price:price*0.5;
+  return isInit?price*ewMarginFactor.value:price*0.5;
 }
 
 function fmtKm2Compare(raw,eff) {
@@ -964,6 +986,21 @@ function toggleStatusGroup(status) {
   collapsedGroups[status] = !collapsedGroups[status];
 }
 
+function toggleAOIGroup(status) {
+  collapsedAOIGroups[status] = !collapsedAOIGroups[status];
+}
+
+const groupedAnnYearProjects = computed(() => {
+  const groups = {};
+  for (const p of annYearProjects.value) {
+    const status = projStatusLabel(p);
+    const cls = projStatusClass(p);
+    if (!groups[status]) groups[status] = { status, statusClass: cls, projects: [] };
+    groups[status].projects.push(p);
+  }
+  return STATUS_ORDER.filter(s => groups[s]).map(s => groups[s]);
+});
+
 let _highlightClearTimer = null;
 function highlightProjectCard(id) {
   clearTimeout(_highlightClearTimer);
@@ -988,11 +1025,11 @@ function projYearCostColor(p) {
 
 function projYearCostText(p) {
   const price = computeShpPrice(p.haiesCount, p.totalLengthM, pp.value);
-  if (p.annee === shpYear.value) return fmt(price);
+  if (p.annee === shpYear.value) return fmt(price * ewMarginFactor.value);
   if (p.annee < shpYear.value) {
     return isSuiviYear(p, shpYear.value) ? fmt(price * 0.5) : '—';
   }
-  return fmt(price);
+  return fmt(price * ewMarginFactor.value);
 }
 
 function updateAnnMap() {
@@ -1099,6 +1136,15 @@ async function loadShpFile(file) {
   }catch(e){
     alert('Erreur lors du chargement de « '+file.name+' » :\n'+e.message);
   }
+}
+
+async function confirmRemoveGroup(group) {
+  const n = group.projects.length;
+  if (!n) return;
+  const msg = `Supprimer ${n} projet${n > 1 ? 's' : ''} du groupe « ${group.status} » ? Cette action est irréversible.`;
+  if (!window.confirm(msg)) return;
+  const ids = group.projects.map(p => p.id);
+  for (const id of ids) await removeShpProject(id);
 }
 
 async function removeShpProject(id) {
@@ -1498,6 +1544,8 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
 .shp-dropzone:hover,.shp-dropzone.drag-over{border-color:var(--green);background:var(--green-pale);color:var(--green);}
 .status-group-header{display:flex;align-items:center;gap:6px;padding:4px 4px;margin-top:4px;cursor:pointer;user-select:none;border-radius:var(--r-sm);background:var(--gray-50);}
 .status-group-header:hover{background:var(--gray-100);}
+.group-del-btn{margin-left:auto;font-size:10px;font-weight:600;padding:3px 8px;border:1px solid var(--gray-200);background:#fff;color:#c62828;border-radius:var(--r-sm);cursor:pointer;transition:.15s;}
+.group-del-btn:hover{background:#ffebee;border-color:#e57373;}
 .shp-proj-card{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--gray-100);cursor:pointer;border-radius:var(--r-sm);transition:background .1s;}
 .shp-proj-card:hover{background:var(--gray-50);}
 .shp-proj-card.selected{background:var(--green-pale);border-left:3px solid var(--green);padding-left:6px;}
