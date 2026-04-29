@@ -374,11 +374,30 @@
 
           <!-- ── Projections sub-tab ── -->
           <div v-show="evalSubTab==='projections'">
-            <p style="font-size:12px;color:var(--gray-600);margin-bottom:14px">
-              Projections 2020 → 2050 — données issues des fichiers chargés + projets supplémentaires renseignés manuellement dans la colonne <strong>+&nbsp;Manuel</strong>.
+            <p style="font-size:12px;color:var(--gray-600);margin-bottom:10px">
+              Projections {{ ALL_YEARS[0] }} → {{ ALL_YEARS[ALL_YEARS.length-1] }} — données issues des fichiers chargés + projets supplémentaires renseignés manuellement dans la colonne <strong>+&nbsp;Manuel</strong>.
               <span style="color:var(--blue)">{{ suiviFreq === 1 ? 'Suivi tous les ans' : 'Suivi tous les ' + suiviFreq + ' ans' }} — coût Pléiades estimé d'après l'année de référence.</span>
               <span style="margin-left:6px;color:var(--gray-600)">· Ligne <span style="background:var(--green-pale);padding:1px 5px;border-radius:4px;font-weight:700;color:var(--green)">verte</span> = année sélectionnée · <span style="color:var(--blue)">Bleu</span> = années futures</span>
             </p>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px;color:var(--gray-600)">
+              <span style="font-weight:600">Filtrer les années :</span>
+              <label>de
+                <select v-model.number="projFromYear" style="font-size:12px;padding:3px 6px;border:1.5px solid var(--gray-200);border-radius:var(--r-sm);margin:0 4px">
+                  <option v-for="y in ALL_YEARS" :key="y" :value="y" :disabled="y > projToYear">{{ y }}</option>
+                </select>
+              </label>
+              <label>à
+                <select v-model.number="projToYear" style="font-size:12px;padding:3px 6px;border:1.5px solid var(--gray-200);border-radius:var(--r-sm);margin:0 4px">
+                  <option v-for="y in ALL_YEARS" :key="y" :value="y" :disabled="y < projFromYear">{{ y }}</option>
+                </select>
+              </label>
+              <button v-if="projFromYear !== ALL_YEARS[0] || projToYear !== ALL_YEARS[ALL_YEARS.length-1]"
+                      @click="resetProjFilter"
+                      style="font-size:11px;padding:3px 10px;border:1px solid var(--gray-200);background:#fff;border-radius:var(--r-sm);cursor:pointer;color:var(--gray-600)">
+                Réinitialiser
+              </button>
+              <span style="margin-left:auto;font-size:11px;color:var(--gray-600)">{{ filteredProjectionRows.length }} année{{ filteredProjectionRows.length > 1 ? 's' : '' }}</span>
+            </div>
             <div class="proj-tbl-scroll" ref="projTableRef" style="margin-bottom:24px">
               <table class="proj-tbl">
                 <thead>
@@ -390,7 +409,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in projectionRows" :key="row.year"
+                  <tr v-for="row in filteredProjectionRows" :key="row.year"
                       :class="{'proj-row-selected': row.isSelected, 'proj-row-future': row.isFuture && !row.isSelected}">
                     <td><strong>{{ row.year }}</strong> <span v-if="row.isSelected" class="pill">Sélectionnée</span></td>
                     <td class="hl">{{ row.total }}</td>
@@ -406,6 +425,28 @@
                     <td class="amt hl" style="font-size:14px">{{ row.totalHT > 0 ? fmt(row.totalHT) : '—' }}</td>
                   </tr>
                 </tbody>
+                <tfoot>
+                  <tr class="proj-row-totals">
+                    <td><strong>Total</strong></td>
+                    <td class="hl">—</td>
+                    <td>{{ projTotals.realNewCount }}</td>
+                    <td>{{ projTotals.manualCount }}</td>
+                    <td>{{ projTotals.exCount }}</td>
+                    <td class="amt">{{ projTotals.subCost > 0 ? fmt(projTotals.subCost) : '—' }}</td>
+                    <td class="amt">{{ projTotals.initCost > 0 ? fmt(projTotals.initCost) : '—' }}</td>
+                    <td class="amt">{{ projTotals.suiviCost > 0 ? fmt(projTotals.suiviCost) : '—' }}</td>
+                    <td class="amt" style="color:var(--blue)">{{ projTotals.pleiCost > 0 ? fmt(projTotals.pleiCost) : '—' }}</td>
+                    <td class="amt hl" style="font-size:14px">{{ projTotals.totalHT > 0 ? fmt(projTotals.totalHT) : '—' }}</td>
+                  </tr>
+                  <tr class="proj-row-avg">
+                    <td colspan="5"><strong>Moyenne par projet</strong> <span style="font-size:10px;color:var(--gray-600);font-weight:400">· basée sur {{ projAvg.projectsRef }} projet{{ projAvg.projectsRef > 1 ? 's' : '' }} actif{{ projAvg.projectsRef > 1 ? 's' : '' }} en {{ projAvg.refYear }}</span></td>
+                    <td class="amt">{{ projAvg.subCost > 0 ? fmt(projAvg.subCost) : '—' }}</td>
+                    <td class="amt">{{ projAvg.initCost > 0 ? fmt(projAvg.initCost) : '—' }}</td>
+                    <td class="amt">{{ projAvg.suiviCost > 0 ? fmt(projAvg.suiviCost) : '—' }}</td>
+                    <td class="amt" style="color:var(--blue)">{{ projAvg.pleiCost > 0 ? fmt(projAvg.pleiCost) : '—' }}</td>
+                    <td class="amt hl" style="font-size:14px">{{ projAvg.totalHT > 0 ? fmt(projAvg.totalHT) : '—' }}</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin-bottom:10px">Évolution du coût total annuel (HT)</div>
@@ -658,6 +699,48 @@ const projectionRows = computed(() => {
   }
   return rows;
 });
+
+const projFromYear = ref(ALL_YEARS[0])
+const projToYear   = ref(ALL_YEARS[ALL_YEARS.length - 1])
+
+function resetProjFilter() {
+  projFromYear.value = ALL_YEARS[0]
+  projToYear.value   = ALL_YEARS[ALL_YEARS.length - 1]
+}
+
+const filteredProjectionRows = computed(() =>
+  projectionRows.value.filter(r => r.year >= projFromYear.value && r.year <= projToYear.value)
+)
+
+const projTotals = computed(() => {
+  const rows = filteredProjectionRows.value
+  const realNewCount = rows.reduce((s, r) => s + r.realNewCount, 0)
+  const manualCount  = rows.reduce((s, r) => s + (manualNewPerYear[r.year] || 0), 0)
+  const exCount      = rows.reduce((s, r) => s + r.exCount, 0)
+  const subCost      = rows.reduce((s, r) => s + (r.newCount > 0 || r.exCount > 0 ? sub.value : 0), 0)
+  const initCost     = rows.reduce((s, r) => s + r.initCost, 0)
+  const suiviCost    = rows.reduce((s, r) => s + r.suiviCost, 0)
+  const pleiCost     = rows.reduce((s, r) => s + r.pleiCost, 0)
+  const totalHT      = rows.reduce((s, r) => s + r.totalHT, 0)
+  return { realNewCount, manualCount, exCount, subCost, initCost, suiviCost, pleiCost, totalHT }
+})
+
+const projAvg = computed(() => {
+  const rows = filteredProjectionRows.value
+  if (!rows.length) return { projectsRef: 0, refYear: '—', subCost: 0, initCost: 0, suiviCost: 0, pleiCost: 0, totalHT: 0 }
+  const peak = rows.reduce((best, r) => r.total > best.total ? r : best, rows[0])
+  const n = peak.total || 1
+  const t = projTotals.value
+  return {
+    projectsRef: peak.total,
+    refYear: peak.year,
+    subCost:   t.subCost   / n,
+    initCost:  t.initCost  / n,
+    suiviCost: t.suiviCost / n,
+    pleiCost:  t.pleiCost  / n,
+    totalHT:   t.totalHT   / n,
+  }
+})
 
 // ── Annual tab (Pléiades) ─────────────────────────────────────────────────
 const annProjectAOIs = computed(() =>
@@ -1529,6 +1612,8 @@ table.proj-tbl tr.proj-row-selected td{background:var(--green-pale)!important;fo
 table.proj-tbl tr.proj-row-future td{color:var(--blue);}
 table.proj-tbl tr.proj-row-future td.amt{color:#1976d2;}
 .proj-tbl-scroll{max-height:420px;overflow-y:auto;border-radius:var(--r-sm);border:1px solid var(--gray-200);}
+table.proj-tbl tfoot tr.proj-row-totals td{background:var(--gray-100);font-weight:700;border-top:2px solid var(--gray-200);border-bottom:none;position:sticky;bottom:37px;z-index:1;}
+table.proj-tbl tfoot tr.proj-row-avg td{background:#fff;font-size:11px;border-top:1px dashed var(--gray-200);border-bottom:none;position:sticky;bottom:0;z-index:1;}
 td.amt{font-weight:600;color:var(--green);text-align:right;}
 td.hl{font-weight:700;color:var(--dark);}
 .pill{display:inline-block;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:600;background:var(--green-pale);color:var(--green);}
