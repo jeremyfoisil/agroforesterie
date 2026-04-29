@@ -439,7 +439,7 @@
                     <td class="amt hl" style="font-size:14px">{{ projTotals.totalHT > 0 ? fmt(projTotals.totalHT) : '—' }}</td>
                   </tr>
                   <tr class="proj-row-avg">
-                    <td colspan="5"><strong>Moyenne par projet</strong> <span style="font-size:10px;color:var(--gray-600);font-weight:400">· sur {{ filteredProjectionRows.length }} an{{ filteredProjectionRows.length > 1 ? 's' : '' }}, basée sur {{ projAvg.projectsRef }} projet{{ projAvg.projectsRef > 1 ? 's' : '' }} actif{{ projAvg.projectsRef > 1 ? 's' : '' }} en {{ projAvg.refYear }}</span></td>
+                    <td colspan="5"><strong>Moyenne par projet</strong> <span style="font-size:10px;color:var(--gray-600);font-weight:400">· <strong style="font-size:10px;color:var(--gray-600)">sur {{ filteredProjectionRows.length }} an{{ filteredProjectionRows.length > 1 ? 's' : '' }}</strong>, basée sur {{ projAvg.projectsRef }} projet{{ projAvg.projectsRef > 1 ? 's' : '' }} actif{{ projAvg.projectsRef > 1 ? 's' : '' }} en {{ projAvg.refYear }}</span></td>
                     <td class="amt">{{ projAvg.subCost > 0 ? fmt(projAvg.subCost) : '—' }}</td>
                     <td class="amt">{{ projAvg.initCost > 0 ? fmt(projAvg.initCost) : '—' }}</td>
                     <td class="amt">{{ projAvg.suiviCost > 0 ? fmt(projAvg.suiviCost) : '—' }}</td>
