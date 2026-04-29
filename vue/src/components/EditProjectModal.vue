@@ -47,22 +47,7 @@
 
       <div class="edit-field">
         <label>Année d'initialisation</label>
-        <input type="number" v-model.number="state.form.annee" min="2000" max="2050"
-               @change="$emit('annee-change')">
-      </div>
-
-      <div class="edit-field">
-        <label>Années de suivi</label>
-        <div style="font-size:11px;color:var(--gray-600);margin-bottom:6px">Sélectionnez les années de suivi triennal</div>
-        <div class="suivi-years-grid">
-          <label v-for="y in state.suiviYearOptions" :key="y"
-                 class="suivi-year-chip" :class="{ active: state.form.suiviYears.includes(y) }">
-            <input type="checkbox" style="display:none"
-                   :checked="state.form.suiviYears.includes(y)"
-                   @change="$emit('toggle-suivi', y)">
-            {{ y }}
-          </label>
-        </div>
+        <input type="number" v-model.number="state.form.annee" min="2000" max="2050">
       </div>
 
       <div class="edit-actions">
@@ -80,5 +65,5 @@ defineProps({
   state: { type: Object, required: true },
   palette: { type: Array, required: true }
 })
-defineEmits(['close', 'save', 'annee-change', 'toggle-suivi'])
+defineEmits(['close', 'save'])
 </script>

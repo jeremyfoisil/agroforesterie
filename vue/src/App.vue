@@ -65,15 +65,6 @@
         Référence : 5 haies / 800 m ≈ 190 € · 30 / 8 km ≈ 560 € · 80 / 25 km ≈ 1 050 €
       </div>
 
-      <div class="sec-div" style="margin-top:18px">Modèle prix — Suivi triennal</div>
-      <div class="fgroup">
-        <div class="flabel"><span>Taux initialisation (€/haie)</span></div>
-        <div class="irow"><input type="number" min="1" max="500" step="1" v-model.number="initRate" style="width:75px"><span>€/haie (suivi = moitié)</span></div>
-      </div>
-      <div class="fgroup">
-        <div class="flabel"><span>Prix plancher par projet (€)</span></div>
-        <div class="irow"><input type="number" min="20" max="500" step="10" v-model.number="priceFloor" style="width:75px"><span>€ minimum/projet</span></div>
-      </div>
     </div>
   </div>
 
@@ -93,13 +84,9 @@
                   @jump-left="timelineJumpLeft"
                   @jump-right="timelineJumpRight" />
 
-    <!-- Mode toggle -->
+    <!-- Mode banner -->
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
-      <div class="mode-toggle">
-        <button class="mode-btn mode-btn-ann" :class="{active: suiviMode==='annuel'}" @click="setSuiviMode('annuel')">Suivi annuel (Pléiades)</button>
-        <button class="mode-btn" :class="{active: suiviMode==='triennal'}" @click="setSuiviMode('triennal')">Suivi triennal</button>
-      </div>
-      <span v-show="suiviMode==='annuel'" class="opt-banner annual" style="margin:0;padding:5px 14px">Estimation des commandes Pléiades Neo activée</span>
+      <span class="opt-banner annual" style="margin:0;padding:5px 14px">Estimation des commandes Pléiades Neo activée</span>
     </div>
 
     <div style="display:grid;grid-template-columns:420px 1fr;gap:18px;align-items:start">
@@ -123,6 +110,18 @@
               <input type="file" ref="fileInputEl" accept=".zip" multiple style="display:none" @change="onFileChange($event)">
             </label>
             <div style="font-size:11px;color:var(--gray-600);margin-top:8px">Archive .zip contenant .shp .dbf .prj — un fichier par projet</div>
+          </div>
+
+          <!-- Fréquence suivi -->
+          <div style="margin-top:14px;padding:10px 12px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--r-sm)">
+            <div class="flabel" style="margin-bottom:6px">
+              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-600)">Fréquence suivi</span>
+              <span class="fval">{{ suiviFreq === 1 ? 'Tous les ans' : 'Tous les ' + suiviFreq + ' ans' }}</span>
+            </div>
+            <input type="range" min="1" max="10" step="1" v-model.number="suiviFreq">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray-600);margin-top:3px">
+              <span>1 an</span><span>10 ans</span>
+            </div>
           </div>
 
           <!-- Project list -->
@@ -179,8 +178,8 @@
 
         </div>
 
-        <!-- Pléiades AOI overview (annuel mode only) -->
-        <div class="panel" v-show="suiviMode==='annuel'" style="margin-top:18px">
+        <!-- Pléiades AOI overview -->
+        <div class="panel" style="margin-top:18px">
           <div class="panel-title">AOIs Pléiades <span class="proj-counter" v-if="shpProjects.length">({{ shpProjects.length }})</span></div>
           <div v-if="!annYearProjects.length" class="proj-empty">Aucun projet actif pour {{ shpYear }}. Chargez des projets ou changez l'année.</div>
           <div v-else>
@@ -207,8 +206,8 @@
           </div>
         </div>
 
-        <!-- Pléiades params (annuel mode only) -->
-        <div class="panel" v-show="suiviMode==='annuel'" style="margin-top:18px">
+        <!-- Pléiades params -->
+        <div class="panel" style="margin-top:18px">
           <div class="sec-div" style="margin-top:0">Paramètres d'acquisition Pléiades</div>
           <div class="fgroup">
             <div class="flabel"><span>Mode d'acquisition</span></div>
@@ -264,8 +263,7 @@
       <div>
         <!-- Maps (one per mode, same DOM slot) -->
         <div class="panel" style="padding:0;overflow:hidden;margin-bottom:18px">
-          <div id="shp-map" v-show="suiviMode==='triennal'" style="height:420px;border-radius:var(--r)"></div>
-          <div id="ann-map" v-show="suiviMode==='annuel'" style="height:420px;border-radius:var(--r)"></div>
+          <div id="ann-map" style="height:420px;border-radius:var(--r)"></div>
         </div>
 
         <!-- Sub-tabs panel -->
@@ -284,54 +282,8 @@
             <div v-if="!shpProjects.length" style="font-size:12px;color:var(--gray-600);padding:8px 0">Chargez des projets pour voir l'évaluation tarifaire.</div>
             <div v-else>
 
-              <!-- Triennal pricing -->
-              <div v-show="suiviMode==='triennal'">
-                <div class="mc hl" style="border-radius:var(--r-sm);padding:13px 15px;margin-bottom:16px">
-                  <div class="mc-label">Total annuel HT</div>
-                  <div class="mc-val">{{ fmt(shpTotalHTYear) }}</div>
-                  <div class="mc-sub">{{ yearVisibleProjects.length }} projet{{ yearVisibleProjects.length > 1 ? 's' : '' }} · {{ shpYear }}</div>
-                  <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:3px">{{ shpYear }} — {{ yearNewOnes.length }} init. · {{ yearSuiviOnes.length }} suivi</div>
-                </div>
-                <div class="brow">
-                  <span class="blabel">Abonnement plateforme</span>
-                  <span class="bamount" :style="{color: yearNewOnes.length === 0 && yearSuiviOnes.length === 0 ? 'var(--gray-200)' : ''}">
-                    {{ yearNewOnes.length === 0 && yearSuiviOnes.length === 0 ? '— (aucune activité)' : fmt(sub) }}
-                  </span>
-                </div>
-                <div class="brow">
-                  <span class="blabel">Nouveaux projets<small v-if="yearNewOnes.length"> — {{ yearNewOnes.length }} projet{{ yearNewOnes.length > 1 ? 's' : '' }}</small></span>
-                  <span class="bamount">{{ fmt(shpInitCostYear) }}</span>
-                </div>
-                <div class="brow">
-                  <span class="blabel">En suivi (−50 %)<small v-if="yearSuiviOnes.length"> — {{ yearSuiviOnes.length }} projet{{ yearSuiviOnes.length > 1 ? 's' : '' }}</small></span>
-                  <span class="bamount">{{ fmt(shpSuiviCostYear) }}</span>
-                </div>
-                <div class="brow total">
-                  <span class="blabel">Total HT</span>
-                  <span class="bamount">{{ fmt(shpTotalHTYear) }}</span>
-                </div>
-                <div class="brow sub-line">
-                  <span class="blabel">TVA 20 %</span>
-                  <span class="bamount">{{ fmt(shpTotalHTYear * 0.2) }}</span>
-                </div>
-                <div class="brow sub-line" style="padding-bottom:10px">
-                  <span class="blabel" style="font-size:13px;font-weight:600;color:var(--gray-800)">Total TTC</span>
-                  <span class="bamount" style="font-size:15px">{{ fmt(shpTotalHTYear * 1.2) }}</span>
-                </div>
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:14px 0 6px">Structure du coût global</div>
-                <div class="chart-wrap" style="height:160px"><canvas id="shp-donut-chart"></canvas></div>
-                <div v-if="yearNewOnes.length > 0">
-                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:16px 0 6px">Coût initialisation par projet</div>
-                  <div class="chart-wrap" :style="{height: Math.max(60, yearNewOnes.length * 32) + 'px'}"><canvas id="shp-bar-init"></canvas></div>
-                </div>
-                <div v-if="yearSuiviOnes.length > 0">
-                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:16px 0 6px">Coût suivi par projet (−50 %)</div>
-                  <div class="chart-wrap" :style="{height: Math.max(60, yearSuiviOnes.length * 32) + 'px'}"><canvas id="shp-bar-suivi"></canvas></div>
-                </div>
-              </div>
-
               <!-- Annuel (Pléiades) pricing -->
-              <div v-show="suiviMode==='annuel'">
+              <div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
                   <div class="mc hl">
                     <div class="mc-label">Total annuel HT</div>
@@ -408,8 +360,7 @@
           <div v-show="evalSubTab==='projections'">
             <p style="font-size:12px;color:var(--gray-600);margin-bottom:14px">
               Projections 2020 → 2050 — données issues des fichiers chargés + projets supplémentaires renseignés manuellement dans la colonne <strong>+&nbsp;Manuel</strong>.
-              <span v-if="suiviMode==='triennal'">Projets initialisés en N → premiers suivis en N+3.</span>
-              <span v-else style="color:var(--blue)">Suivi annuel : tous les projets antérieurs sont imagés chaque année — coût Pléiades estimé d'après l'année de référence.</span>
+              <span style="color:var(--blue)">{{ suiviFreq === 1 ? 'Suivi tous les ans' : 'Suivi tous les ' + suiviFreq + ' ans' }} — coût Pléiades estimé d'après l'année de référence.</span>
               <span style="margin-left:6px;color:var(--gray-600)">· Ligne <span style="background:var(--green-pale);padding:1px 5px;border-radius:4px;font-weight:700;color:var(--green)">verte</span> = année sélectionnée · <span style="color:var(--blue)">Bleu</span> = années futures</span>
             </p>
             <div class="proj-tbl-scroll" ref="projTableRef" style="margin-bottom:24px">
@@ -418,7 +369,7 @@
                   <tr>
                     <th>Année</th><th>Total projets</th><th>Fichiers</th><th>+ Manuel</th><th>Dont suivis</th>
                     <th>Abonnement</th><th>Initialisation</th><th>Suivi</th>
-                    <th v-if="suiviMode==='annuel'" style="color:#90caf9">Pléiades (est.)</th>
+                    <th style="color:#90caf9">Pléiades (est.)</th>
                     <th>Total HT</th>
                   </tr>
                 </thead>
@@ -435,7 +386,7 @@
                     </td>
                     <td class="amt">{{ row.initCost > 0 ? fmt(row.initCost) : '—' }}</td>
                     <td class="amt">{{ row.suiviCost > 0 ? fmt(row.suiviCost) : '—' }}</td>
-                    <td v-if="suiviMode==='annuel'" class="amt" style="color:var(--blue)">{{ row.pleiCost > 0 ? fmt(row.pleiCost) : '—' }}</td>
+                    <td class="amt" style="color:var(--blue)">{{ row.pleiCost > 0 ? fmt(row.pleiCost) : '—' }}</td>
                     <td class="amt hl" style="font-size:14px">{{ row.totalHT > 0 ? fmt(row.totalHT) : '—' }}</td>
                   </tr>
                 </tbody>
@@ -466,9 +417,7 @@
 <EditProjectModal :state="editModal"
                   :palette="PALETTE"
                   @close="closeEditModal"
-                  @save="saveEditModal"
-                  @annee-change="onEditAnneeChange"
-                  @toggle-suivi="toggleEditSuiviYear" />
+                  @save="saveEditModal" />
 
 <footer>Kermap — Simulateur de tarification « Suivi des projets d'agroforesterie » — {{ currentDate }}</footer>
 
@@ -486,7 +435,7 @@ import {
   ALL_YEARS, TIMELINE_VISIBLE, TIMELINE_MAX_OFFSET,
   DEPT_STYLE_DARK, DEPT_STYLE_LIGHT
 } from './constants.js'
-import { fmt, fmtN, fmtLen, defaultSuiviYears } from './utils/format.js'
+import { fmt, fmtN, fmtLen } from './utils/format.js'
 import { computeShpPrice } from './utils/pricing.js'
 import { geomLength, calcOptimizedProjectAOIs, consolidateAOIs } from './utils/geo.js'
 
@@ -498,8 +447,6 @@ import EditProjectModal from './components/EditProjectModal.vue'
 const SETTINGS_PASSWORD = import.meta.env.VITE_SETTINGS_PASSWORD || 'KerMap'
 
 // ── Tab / UI state ────────────────────────────────────────────────────────
-const activeTab      = ref('shp');
-const suiviMode      = ref('annuel'); // 'annuel' | 'triennal'
 const evalSubTab     = ref('eval');     // 'eval' | 'projections'
 const settingsOpen     = ref(false);
 const settingsUnlocked = ref(false);
@@ -516,8 +463,10 @@ const shpWH     = ref(70);
 const shpMaxH   = ref(200);
 const shpMaxML  = ref(100000);
 const shpProg   = ref('log');
-const initRate  = ref(30);
-const priceFloor= ref(100);
+
+// ── Fréquence suivi (en années, 1 = chaque année) ─────────────────────────
+const suiviFreq = ref(parseInt(localStorage.getItem('suiviFreq') || '1', 10) || 1);
+watch(suiviFreq, v => localStorage.setItem('suiviFreq', String(v)));
 
 // ── Annual tab params ─────────────────────────────────────────────────────
 const annDifficulty = ref('easy');
@@ -570,15 +519,12 @@ const colorPicker = reactive({open:false,projId:null,top:0,left:0});
 const editModal = reactive({
   open: false,
   projId: null,
-  form: {name:'', color:'', haiesCount:0, totalLengthM:0, annee:0, suiviYears:[]},
-  suiviYearOptions: []
+  form: {name:'', color:'', haiesCount:0, totalLengthM:0, annee:0}
 });
 
 // ── Map / chart instances (non-reactive) ──────────────────────────────────
-let shpMapInst=null, shpLayerGroupInst=null;
 let annMapInst=null, annLayerGroupInst=null;
 let shpProjBarInst=null, shpAvgCostInst=null;
-let shpDonutInst=null, shpInitInst=null, shpSuiviInst=null;
 let annDonutInst=null, annAreaInst=null, annPleiInst=null;
 
 // ── Computed pricing params ───────────────────────────────────────────────
@@ -595,36 +541,22 @@ const shpExOnes  = computed(() => shpProjects.value.filter(p=>!p.isNew));
 const shpTotalHaies = computed(() => shpProjects.value.reduce((s,p)=>s+p.haiesCount,0));
 const shpTotalLen   = computed(() => shpProjects.value.reduce((s,p)=>s+p.totalLengthM,0));
 
-// ── Shapefile tab pricing ─────────────────────────────────────────────────
-const shpInitCost  = computed(() => shpNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0));
-const shpSuiviCost = computed(() => shpExOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*0.5,0));
-const shpTotalHT   = computed(() => sub.value+shpInitCost.value+shpSuiviCost.value);
-
-function shpProjAnnCost(p) {
-  const price = computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-  return p.isNew ? price : price*0.5;
-}
-
 // ── Year-filtered computed values ─────────────────────────────────────────
 // Projects initialized exactly in the selected year → initialization billing
 const yearNewOnes = computed(() =>
   shpProjects.value.filter(p => p.annee === shpYear.value)
 );
 
-// Helper: is `year` a suivi year for project `p`?
+// Helper: is `year` a suivi year for project `p` based on global frequency
 function isSuiviYear(p, year) {
   if (p.annee >= year) return false;
-  if (p.suiviYears && p.suiviYears.length > 0) return p.suiviYears.includes(year);
-  return (year - p.annee) % 3 === 0;
+  const N = Math.max(1, suiviFreq.value);
+  return (year - p.annee) % N === 0;
 }
 
-// Projects in suivi for the selected year.
-// Annuel mode: all past projects are monitored every year.
-// Triennal mode: only every-3-year cycles.
+// Projects in suivi for the selected year (every N years after init)
 const yearSuiviOnes = computed(() =>
-  suiviMode.value === 'annuel'
-    ? shpProjects.value.filter(p => p.annee < shpYear.value)
-    : shpProjects.value.filter(p => isSuiviYear(p, shpYear.value))
+  shpProjects.value.filter(p => isSuiviYear(p, shpYear.value))
 );
 
 // All projects existing at or before selected year
@@ -647,7 +579,7 @@ const shpTotalHTYear = computed(() => {
 // ── Projection 2020→2050 ──────────────────────────────────────────────────
 const projectionRows = computed(() => {
   const startYear = shpYear.value;
-  const isAnnuel  = suiviMode.value === 'annuel';
+  const N = Math.max(1, suiviFreq.value);
 
   const avgPrice = shpProjects.value.length > 0
     ? shpProjects.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0) / shpProjects.value.length
@@ -670,14 +602,10 @@ const projectionRows = computed(() => {
     }
 
     const realInit  = shpProjects.value.filter(p => p.annee === year);
-    const realSuivi = isAnnuel
-      ? shpProjects.value.filter(p => p.annee < year)
-      : shpProjects.value.filter(p => isSuiviYear(p, year));
+    const realSuivi = shpProjects.value.filter(p => isSuiviYear(p, year));
 
     const fInit  = forecasts.filter(p => p.annee === year);
-    const fSuivi = isAnnuel
-      ? forecasts.filter(p => p.annee < year)
-      : forecasts.filter(p => p.annee < year && (year - p.annee) % 3 === 0);
+    const fSuivi = forecasts.filter(p => p.annee < year && (year - p.annee) % N === 0);
 
     const initCost  = realInit.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0)
                     + fInit.reduce((s, p) => s + p.price, 0);
@@ -693,7 +621,7 @@ const projectionRows = computed(() => {
 
     const activeCount = newCount + exCount;
     const estArea = activeCount * avgAreaPerProj * pleiPad;
-    const pleiCost = isAnnuel && hasActivity
+    const pleiCost = hasActivity
       ? (estArea < MIN_KM2 ? MIN_KM2 * pleiRate : estArea * pleiRate)
       : 0;
     const totalHT  = (hasActivity ? sub.value : 0) + initCost + suiviCost + pleiCost;
@@ -807,12 +735,6 @@ async function applyProjColor(projId,color) {
   const proj=shpProjects.value.find(p=>p.id===projId);
   if(!proj) return;
   proj.color=color;
-  if(proj._layer){
-    proj._layer.eachLayer(l=>{
-      if(l instanceof L.CircleMarker) l.setStyle({fillColor:color,color:'#fff'});
-      else if(l.setStyle) l.setStyle({color,fillColor:color});
-    });
-  }
   if(proj.dbId) await supabase.from('projets_agroforesterie').update({couleur:color}).eq('id',proj.dbId);
 }
 
@@ -831,18 +753,13 @@ function openEditModal(projId) {
   const proj = shpProjects.value.find(p => p.id === projId);
   if (!proj) return;
   editModal.projId = projId;
-  const suiviYears = proj.suiviYears && proj.suiviYears.length > 0
-    ? [...proj.suiviYears]
-    : defaultSuiviYears(proj.annee);
   editModal.form = {
     name: proj.name,
     color: proj.color,
     haiesCount: proj.haiesCount,
     totalLengthM: proj.totalLengthM,
-    annee: proj.annee,
-    suiviYears
+    annee: proj.annee
   };
-  editModal.suiviYearOptions = Array.from({length:10}, (_,i) => proj.annee + 1 + i);
   editModal.open = true;
 }
 
@@ -851,32 +768,19 @@ function closeEditModal() {
   editModal.projId = null;
 }
 
-function onEditAnneeChange() {
-  editModal.suiviYearOptions = Array.from({length:10}, (_,i) => editModal.form.annee + 1 + i);
-  editModal.form.suiviYears = defaultSuiviYears(editModal.form.annee);
-}
-
-function toggleEditSuiviYear(y) {
-  const idx = editModal.form.suiviYears.indexOf(y);
-  if (idx >= 0) editModal.form.suiviYears.splice(idx, 1);
-  else editModal.form.suiviYears.push(y);
-}
-
 async function saveEditModal() {
   const proj = shpProjects.value.find(p => p.id === editModal.projId);
   if (!proj) return;
   proj.name = editModal.form.name;
   proj.annee = editModal.form.annee;
-  proj.suiviYears = [...editModal.form.suiviYears];
   if (editModal.form.color !== proj.color) {
     await applyProjColor(proj.id, editModal.form.color);
   }
   if (proj.dbId) {
     await supabase.from('projets_agroforesterie')
-      .update({nom: proj.name, annee: proj.annee, suivi_years: proj.suiviYears})
+      .update({nom: proj.name, annee: proj.annee})
       .eq('id', proj.dbId);
   }
-  updateShpMapStyles();
   closeEditModal();
 }
 
@@ -1002,24 +906,6 @@ async function addDeptBoundaries(mapInst, startOnOrtho = false) {
   }
 }
 
-function initShpMap() {
-  if(shpMapInst){shpMapInst.invalidateSize();return;}
-  shpMapInst=L.map('shp-map').setView([46.5,2.5],6);
-  const cartoLayer=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    {attribution:'© OpenStreetMap contributors © CARTO',maxZoom:19});
-  const orthoLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {attribution:'Tiles © Esri',maxZoom:19});
-  cartoLayer.addTo(shpMapInst);
-  const shpLayerCtrl=L.control.layers(
-    {'Carte (CARTO)':cartoLayer,'Orthophotos (ESRI)':orthoLayer},
-    {},
-    {position:'topright',collapsed:false}
-  ).addTo(shpMapInst);
-  addDeptBoundaries(shpMapInst, false);
-  shpLayerGroupInst=L.layerGroup().addTo(shpMapInst);
-  addOrthoMillesimeOverlay(shpMapInst, shpLayerCtrl);
-}
-
 function initAnnMap() {
   if(annMapInst){annMapInst.invalidateSize();return;}
   annMapInst=L.map('ann-map').setView([46.5,2.5],6);
@@ -1032,72 +918,19 @@ function initAnnMap() {
   addOrthoMillesimeOverlay(annMapInst, annLayerCtrl);
 }
 
-// ── Map layer helpers ─────────────────────────────────────────────────────
-function addShpToMap(proj) {
-  if(!shpMapInst||!shpLayerGroupInst) return;
-  const layer=L.geoJSON(proj.fc,{
-    style:{color:proj.color,weight:3,opacity:0.85},
-    pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:4,fillColor:proj.color,color:'#fff',weight:1,fillOpacity:0.8}),
-    onEachFeature:(f,fl)=>{
-      fl.bindPopup('<strong>'+proj.name+'</strong>'+(geomLength(f.geometry)>0?'<br>Longueur : '+fmtLen(geomLength(f.geometry)):''));
-    }
-  });
-  layer.addTo(shpLayerGroupInst);
-  proj._layer=layer;
-  fitShpMap();
-}
-
-function fitShpMap() {
-  if(!shpLayerGroupInst) return;
-  const valid=shpLayerGroupInst.getLayers().filter(l=>typeof l.getBounds==='function');
-  if(!valid.length) return;
-  try {
-    let b=valid[0].getBounds();
-    for(let i=1;i<valid.length;i++) b=b.extend(valid[i].getBounds());
-    if(b.isValid()) shpMapInst.fitBounds(b,{padding:[24,24]});
-  }catch(e){}
-}
-
-// ── Map opacity based on selected year ────────────────────────────────────
-function updateShpMapStyles() {
-  if(!shpLayerGroupInst) return;
-  const selectedYear=shpYear.value;
-  shpProjects.value.forEach(proj=>{
-    if(!proj._layer) return;
-    const isCurrent=proj.annee===selectedYear;
-    proj._layer.eachLayer(l=>{
-      if(l instanceof L.CircleMarker){
-        l.setStyle({fillOpacity:isCurrent?0.8:0.35,opacity:isCurrent?1:0.5});
-      } else if(l.setStyle){
-        l.setStyle({opacity:isCurrent?0.85:0.35,fillOpacity:isCurrent?0.3:0.08});
-      }
-    });
-  });
-}
-
-// Helper: CSS class for year badge
-function projYearClass(p) {
-  if(p.annee===shpYear.value) return 'current';
-  if(p.annee<shpYear.value) return 'past';
-  return 'future';
-}
-
 // ── Year timeline helpers ──────────────────────────────────────────────────
 function yearInitCountFor(y) {
   return shpProjects.value.filter(p => p.annee === y).length;
 }
 function yearSuiviCountFor(y) {
-  return suiviMode.value === 'annuel'
-    ? shpProjects.value.filter(p => p.annee < y).length
-    : shpProjects.value.filter(p => isSuiviYear(p, y)).length;
+  return shpProjects.value.filter(p => isSuiviYear(p, y)).length;
 }
 
 // ── Project card status helpers (driven by shpYear) ───────────────────────
 function projStatusLabel(p) {
   if (p.annee === shpYear.value) return 'Initialisation';
   if (p.annee < shpYear.value) {
-    const suivi = suiviMode.value === 'annuel' || isSuiviYear(p, shpYear.value);
-    return suivi ? 'Suivi' : 'Actif';
+    return isSuiviYear(p, shpYear.value) ? 'Suivi' : 'Actif';
   }
   return 'Prévu';
 }
@@ -1105,8 +938,7 @@ function projStatusLabel(p) {
 function projStatusClass(p) {
   if (p.annee === shpYear.value) return 'new';
   if (p.annee < shpYear.value) {
-    const suivi = suiviMode.value === 'annuel' || isSuiviYear(p, shpYear.value);
-    return suivi ? 'existing' : 'inter';
+    return isSuiviYear(p, shpYear.value) ? 'existing' : 'inter';
   }
   return 'future';
 }
@@ -1149,8 +981,7 @@ function clearProjectHighlight() {
 function projYearCostColor(p) {
   if (p.annee === shpYear.value) return 'var(--green)';
   if (p.annee < shpYear.value) {
-    const suivi = suiviMode.value === 'annuel' || isSuiviYear(p, shpYear.value);
-    return suivi ? 'var(--gray-600)' : 'var(--gray-300,#b0bec5)';
+    return isSuiviYear(p, shpYear.value) ? 'var(--gray-600)' : 'var(--gray-300,#b0bec5)';
   }
   return 'var(--blue)';
 }
@@ -1159,8 +990,7 @@ function projYearCostText(p) {
   const price = computeShpPrice(p.haiesCount, p.totalLengthM, pp.value);
   if (p.annee === shpYear.value) return fmt(price);
   if (p.annee < shpYear.value) {
-    const suivi = suiviMode.value === 'annuel' || isSuiviYear(p, shpYear.value);
-    return suivi ? fmt(price * 0.5) : '—';
+    return isSuiviYear(p, shpYear.value) ? fmt(price * 0.5) : '—';
   }
   return fmt(price);
 }
@@ -1259,16 +1089,13 @@ async function loadShpFile(file) {
       const totalLengthM=features.reduce((s,f)=>s+geomLength(f.geometry),0);
       const fc={type:'FeatureCollection',features};
       const color=SHP_COLORS[shpProjects.value.length%SHP_COLORS.length];
-      const suiviYears=defaultSuiviYears(annee);
-      const proj={id:shpNextId++,name:nom,haiesCount,totalLengthM,isNew:true,color,fc,dbId:null,annee,suiviYears};
+      const proj={id:shpNextId++,name:nom,haiesCount,totalLengthM,isNew:true,color,fc,dbId:null,annee};
       shpProjects.value.push(proj);
       const {data,error}=await supabase.from('projets_agroforesterie')
-        .insert({nom,haies_count:haiesCount,total_length_m:totalLengthM,is_new:true,couleur:color,geojson:fc,annee,suivi_years:suiviYears})
+        .insert({nom,haies_count:haiesCount,total_length_m:totalLengthM,is_new:true,couleur:color,geojson:fc,annee,suivi_years:[]})
         .select().single();
       if(!error&&data) proj.dbId=data.id;
-      addShpToMap(proj);
     }
-    updateShpMapStyles();
   }catch(e){
     alert('Erreur lors du chargement de « '+file.name+' » :\n'+e.message);
   }
@@ -1279,28 +1106,20 @@ async function removeShpProject(id) {
   if(idx<0) return;
   const proj=shpProjects.value[idx];
   if(proj.dbId) await supabase.from('projets_agroforesterie').delete().eq('id',proj.dbId);
-  if(proj._layer&&shpLayerGroupInst) shpLayerGroupInst.removeLayer(proj._layer);
   shpProjects.value.splice(idx,1);
   if(selectedShpId.value===id) selectedShpId.value=null;
-}
-
-async function toggleShpStatus(id) {
-  const proj=shpProjects.value.find(p=>p.id===id);
-  if(!proj) return;
-  proj.isNew=!proj.isNew;
-  if(proj.dbId) await supabase.from('projets_agroforesterie').update({is_new:proj.isNew}).eq('id',proj.dbId);
 }
 
 function focusShpProject(id) {
   if(selectedShpId.value===id){
     selectedShpId.value=null;
-    if(suiviMode.value==='annuel'&&annMapInst) updateAnnMap(); else fitShpMap();
+    if(annMapInst) updateAnnMap();
     return;
   }
   const proj=shpProjects.value.find(p=>p.id===id);
   if(!proj) return;
   selectedShpId.value=id;
-  if(suiviMode.value==='annuel'&&annMapInst){
+  if(annMapInst){
     try{
       const projAOIs=annProjectAOIsYear.value.find(x=>x.projectId===proj.id);
       const hulls=projAOIs?.aois?.map(a=>a.hull).filter(Boolean)||[];
@@ -1309,8 +1128,6 @@ function focusShpProject(id) {
         :proj.fc;
       if(src){const b=L.geoJSON(src).getBounds();if(b.isValid())annMapInst.fitBounds(b,{padding:[40,40]});}
     }catch(e){}
-  } else if(proj._layer&&shpMapInst){
-    try{const b=proj._layer.getBounds();if(b.isValid())shpMapInst.fitBounds(b,{padding:[30,30]});}catch(e){}
   }
 }
 
@@ -1322,12 +1139,9 @@ async function loadProjectsFromDB() {
   for(const row of data){
     const annee = row.annee || new Date().getFullYear();
     const proj={id:shpNextId++,dbId:row.id,name:row.nom,haiesCount:row.haies_count,
-      totalLengthM:row.total_length_m,isNew:row.is_new,color:row.couleur,fc:row.geojson,
-      annee,suiviYears:row.suivi_years||[]};
+      totalLengthM:row.total_length_m,isNew:row.is_new,color:row.couleur,fc:row.geojson,annee};
     shpProjects.value.push(proj);
-    if(proj.fc) addShpToMap(proj);
   }
-  updateShpMapStyles();
 }
 
 // ── 100 km² threshold search ──────────────────────────────────────────────
@@ -1370,57 +1184,18 @@ function applyThreshold100() {
   },20);
 }
 
-// ── Mode / sub-tab switching ──────────────────────────────────────────────
-function setSuiviMode(mode) {
-  if(suiviMode.value===mode) return;
-  destroyShpCharts(); destroyAnnCharts();
-  suiviMode.value=mode;
-  nextTick(()=>setTimeout(()=>{
-    if(mode==='triennal'){
-      initShpMap(); updateShpMapStyles();
-      if(shpProjects.value.length) updateShpCharts();
-    } else {
-      initShpMap(); // keep shp map initialised for when we switch back
-      initAnnMap();
-      if(shpProjects.value.length){updateAnnMap();updateAnnCharts();}
-    }
-  },30));
-}
+// ── Sub-tab switching ─────────────────────────────────────────────────────
 function setEvalSubTab(tab) {
   evalSubTab.value=tab;
   nextTick(()=>setTimeout(()=>{
     if(!shpProjects.value.length) return;
-    if(tab==='eval'){
-      if(suiviMode.value==='annuel'){updateAnnCharts();}
-      else{updateShpCharts();}
-    } else {
-      updateShpCharts(); // redraws projection bar
-    }
-  },30));
-}
-
-// ── Tab switching ─────────────────────────────────────────────────────────
-function setTab(tab) {
-  if(activeTab.value==='shp'){ destroyShpCharts(); }
-  else if(activeTab.value==='ann'){ destroyAnnCharts(); }
-  activeTab.value=tab;
-  nextTick(()=>setTimeout(()=>{
-    if(tab==='shp'){
-      initShpMap();
-      updateShpMapStyles();
-      if(shpProjects.value.length) updateShpCharts();
-    } else if(tab==='ann'){
-      initAnnMap();
-      if(shpProjects.value.length){updateAnnMap();updateAnnCharts();}
-    }
+    if(tab==='eval') updateAnnCharts();
+    updateProjCharts();
   },30));
 }
 
 // ── Chart helpers ─────────────────────────────────────────────────────────
-function destroyShpCharts(){
-  if(shpDonutInst){shpDonutInst.destroy();shpDonutInst=null;}
-  if(shpInitInst) {shpInitInst.destroy(); shpInitInst=null;}
-  if(shpSuiviInst){shpSuiviInst.destroy();shpSuiviInst=null;}
+function destroyProjCharts(){
   if(shpProjBarInst){shpProjBarInst.destroy();shpProjBarInst=null;}
   if(shpAvgCostInst){shpAvgCostInst.destroy();shpAvgCostInst=null;}
 }
@@ -1432,56 +1207,7 @@ function destroyAnnCharts(){
 
 function getCtx(id){const c=document.getElementById(id);return c?c.getContext('2d'):null;}
 
-function updateShpCharts(){
-  const dCtx=getCtx('shp-donut-chart');
-  if(dCtx){
-    const dData=[sub.value,shpInitCostYear.value,shpSuiviCostYear.value];
-    if(shpDonutInst){shpDonutInst.data.datasets[0].data=dData;shpDonutInst.update();}
-    else {
-      shpDonutInst=new Chart(dCtx,{type:'doughnut',
-        data:{labels:['Abonnement','Initialisation','Suivi'],datasets:[{data:dData,backgroundColor:['#2d6a4f','#52b788','#95d5b2'],borderWidth:2,borderColor:'#fff'}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},padding:8,boxWidth:12}},tooltip:{callbacks:{label:c=>` ${c.label} : ${Math.round(c.raw).toLocaleString('fr-FR')} €`}}}}
-      });
-    }
-  }
-  // Init bar
-  const newOnes=yearNewOnes.value;
-  if(newOnes.length){
-    const iCtx=getCtx('shp-bar-init');
-    if(iCtx){
-      const iData=newOnes.map(p=>Math.round(computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)));
-      const iLabels=newOnes.map(p=>p.name), iColors=newOnes.map(p=>p.color);
-      if(shpInitInst){shpInitInst.data.labels=iLabels;shpInitInst.data.datasets[0].data=iData;shpInitInst.data.datasets[0].backgroundColor=iColors;shpInitInst.update();}
-      else {
-        shpInitInst=new Chart(iCtx,{type:'bar',
-          data:{labels:iLabels,datasets:[{label:'Init',data:iData,backgroundColor:iColors,borderRadius:4,borderSkipped:false}]},
-          options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Math.round(c.raw).toLocaleString('fr-FR')} €`}}},
-            scales:{x:{ticks:{callback:v=>v.toLocaleString('fr-FR')+' €',font:{size:10}}},y:{ticks:{font:{size:11}}}}}
-        });
-      }
-    }
-  } else { if(shpInitInst){shpInitInst.destroy();shpInitInst=null;} }
-
-  // Suivi bar
-  const exOnes=yearSuiviOnes.value;
-  if(exOnes.length){
-    const sCtx=getCtx('shp-bar-suivi');
-    if(sCtx){
-      const sData=exOnes.map(p=>Math.round(computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*0.5));
-      const sLabels=exOnes.map(p=>p.name), sColors=exOnes.map(p=>p.color);
-      if(shpSuiviInst){shpSuiviInst.data.labels=sLabels;shpSuiviInst.data.datasets[0].data=sData;shpSuiviInst.data.datasets[0].backgroundColor=sColors;shpSuiviInst.update();}
-      else {
-        shpSuiviInst=new Chart(sCtx,{type:'bar',
-          data:{labels:sLabels,datasets:[{label:'Suivi',data:sData,backgroundColor:sColors,borderRadius:4,borderSkipped:false}]},
-          options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Math.round(c.raw).toLocaleString('fr-FR')} €`}}},
-            scales:{x:{ticks:{callback:v=>v.toLocaleString('fr-FR')+' €',font:{size:10}}},y:{ticks:{font:{size:11}}}}}
-        });
-      }
-    }
-  } else { if(shpSuiviInst){shpSuiviInst.destroy();shpSuiviInst=null;} }
-
+function updateProjCharts(){
   // Projection bar chart — 5 ans à partir de shpYear
   const bCtx=getCtx('shp-bar-proj');
   if(bCtx&&projectionRows.value.length){
@@ -1604,7 +1330,6 @@ function updateAnnCharts(){
 
 // ── Watchers: update charts reactively ────────────────────────────────────
 watch(shpYear, async ()=>{
-  updateShpMapStyles();
   // Auto-scroll dans le tableau de projections si l'onglet est actif
   if (evalSubTab.value === 'projections') {
     await nextTick();
@@ -1614,16 +1339,15 @@ watch(shpYear, async ()=>{
 });
 
 watch([
-  shpTotalHTYear,
   projectionRows,
-  ()=>shpProjects.value.map(p=>p.color+p.isNew+p.annee+(p.suiviYears||[]).join(',')).join('|')
+  ()=>shpProjects.value.map(p=>p.color+p.isNew+p.annee).join('|')
 ], async ()=>{
   if(!shpProjects.value.length) return;
-  await nextTick(); updateShpCharts();
+  await nextTick(); updateProjCharts();
 }, {deep:true});
 
 watch([annPricing, annProjectAOIs], async ()=>{
-  if(suiviMode.value!=='annuel'||!shpProjects.value.length) return;
+  if(!shpProjects.value.length) return;
   await nextTick(); updateAnnMap(); updateAnnCharts();
 }, {deep:true});
 
@@ -1639,8 +1363,6 @@ async function loadPricingFromDB() {
   shpMaxH.value     = data.shp_max_h;
   shpMaxML.value    = data.shp_max_ml;
   shpProg.value     = data.shp_prog;
-  initRate.value    = data.init_rate;
-  priceFloor.value  = data.price_floor;
   annDifficulty.value = data.ann_difficulty;
   annRate.value     = data.ann_rate;
   annCloud.value    = data.ann_cloud;
@@ -1660,8 +1382,8 @@ async function savePricingToDB() {
     shp_max_h:     shpMaxH.value,
     shp_max_ml:    shpMaxML.value,
     shp_prog:      shpProg.value,
-    init_rate:     initRate.value,
-    price_floor:   priceFloor.value,
+    init_rate:     30,
+    price_floor:   100,
     ann_difficulty: annDifficulty.value,
     ann_rate:      annRate.value,
     ann_cloud:     annCloud.value,
@@ -1682,7 +1404,7 @@ function scheduleSavePricing() {
 
 watch(
   [sub, shpBase, shpScale, shpWH, shpMaxH, shpMaxML, shpProg,
-   initRate, priceFloor, annDifficulty, annRate, annCloud,
+   annDifficulty, annRate, annCloud,
    annPadding, annBufferM, annClusterM, annConsolKm],
   scheduleSavePricing
 );
@@ -1690,7 +1412,7 @@ watch(
 // ── Init ──────────────────────────────────────────────────────────────────
 onMounted(()=>{
   setTimeout(()=>{
-    if(suiviMode.value==='annuel') initAnnMap(); else initShpMap();
+    initAnnMap();
     loadProjectsFromDB();
     loadPricingFromDB();
   }, 120);

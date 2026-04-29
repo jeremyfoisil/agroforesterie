@@ -14,7 +14,3 @@ export function fmtLen(m) {
   }
   return Math.round(m).toLocaleString('fr-FR') + ' m'
 }
-
-export function defaultSuiviYears(annee) {
-  return [annee + 3, annee + 6, annee + 9]
-}
