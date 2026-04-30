@@ -128,6 +128,18 @@
             </div>
           </div>
 
+          <!-- Durée de suivi -->
+          <div style="margin-top:8px;padding:10px 12px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--r-sm)">
+            <div class="flabel" style="margin-bottom:6px">
+              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-600)">Durée de suivi des projets</span>
+              <span class="fval">{{ suiviDuree }} an{{ suiviDuree > 1 ? 's' : '' }}</span>
+            </div>
+            <input type="range" min="5" max="30" step="1" v-model.number="suiviDuree">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray-600);margin-top:3px">
+              <span>5 ans</span><span>30 ans</span>
+            </div>
+          </div>
+
           <!-- Project list -->
           <div style="margin-top:10px">
             <!-- Search -->
@@ -521,9 +533,9 @@ const shpMaxH   = ref(200);
 const shpMaxML  = ref(100000);
 const shpProg   = ref('log');
 
-// ── Fréquence suivi (en années, 1 = chaque année) ─────────────────────────
-const suiviFreq = ref(parseInt(localStorage.getItem('suiviFreq') || '1', 10) || 1);
-watch(suiviFreq, v => localStorage.setItem('suiviFreq', String(v)));
+// ── Fréquence et durée de suivi ───────────────────────────────────────────
+const suiviFreq  = ref(1);
+const suiviDuree = ref(10);
 
 // ── Marge Earthworm (% appliqué sur le tarif d'initialisation) ────────────
 const ewMargin = ref(parseFloat(localStorage.getItem('ewMargin') || '0') || 0);
@@ -613,6 +625,7 @@ const yearNewOnes = computed(() =>
 // Helper: is `year` a suivi year for project `p` based on global frequency
 function isSuiviYear(p, year) {
   if (p.annee >= year) return false;
+  if (year - p.annee > suiviDuree.value) return false;
   const N = Math.max(1, suiviFreq.value);
   return (year - p.annee) % N === 0;
 }
@@ -668,7 +681,7 @@ const projectionRows = computed(() => {
     const realSuivi = shpProjects.value.filter(p => isSuiviYear(p, year));
 
     const fInit  = forecasts.filter(p => p.annee === year);
-    const fSuivi = forecasts.filter(p => p.annee < year && (year - p.annee) % N === 0);
+    const fSuivi = forecasts.filter(p => p.annee < year && (year - p.annee) % N === 0 && (year - p.annee) <= suiviDuree.value);
 
     const initCost  = (realInit.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0)
                     + fInit.reduce((s, p) => s + p.price, 0)) * ewMarginFactor.value;
@@ -1035,6 +1048,7 @@ function yearSuiviCountFor(y) {
 function projStatusLabel(p) {
   if (p.annee === shpYear.value) return 'Initialisation';
   if (p.annee < shpYear.value) {
+    if (shpYear.value - p.annee > suiviDuree.value) return 'Terminé';
     return isSuiviYear(p, shpYear.value) ? 'Suivi' : 'Actif';
   }
   return 'Prévu';
@@ -1043,12 +1057,13 @@ function projStatusLabel(p) {
 function projStatusClass(p) {
   if (p.annee === shpYear.value) return 'new';
   if (p.annee < shpYear.value) {
+    if (shpYear.value - p.annee > suiviDuree.value) return 'done';
     return isSuiviYear(p, shpYear.value) ? 'existing' : 'inter';
   }
   return 'future';
 }
 
-const STATUS_ORDER = ['Initialisation', 'Suivi', 'Actif', 'Prévu'];
+const STATUS_ORDER = ['Initialisation', 'Suivi', 'Actif', 'Prévu', 'Terminé'];
 
 const filteredGroupedProjects = computed(() => {
   const q = projSearch.value.trim().toLowerCase();
@@ -1101,6 +1116,7 @@ function clearProjectHighlight() {
 function projYearCostColor(p) {
   if (p.annee === shpYear.value) return 'var(--green)';
   if (p.annee < shpYear.value) {
+    if (shpYear.value - p.annee > suiviDuree.value) return 'var(--gray-300,#b0bec5)';
     return isSuiviYear(p, shpYear.value) ? 'var(--gray-600)' : 'var(--gray-300,#b0bec5)';
   }
   return 'var(--blue)';
@@ -1110,6 +1126,7 @@ function projYearCostText(p) {
   const price = computeShpPrice(p.haiesCount, p.totalLengthM, pp.value);
   if (p.annee === shpYear.value) return fmt(price * ewMarginFactor.value);
   if (p.annee < shpYear.value) {
+    if (shpYear.value - p.annee > suiviDuree.value) return '—';
     return isSuiviYear(p, shpYear.value) ? fmt(price * 0.5) : '—';
   }
   return fmt(price * ewMarginFactor.value);
@@ -1499,6 +1516,8 @@ async function loadPricingFromDB() {
   annBufferM.value  = data.ann_buffer_m;
   annClusterM.value = data.ann_cluster_m;
   annConsolKm.value = data.ann_consol_km;
+  if (data.suivi_freq  != null) suiviFreq.value  = data.suivi_freq;
+  if (data.suivi_duree != null) suiviDuree.value = data.suivi_duree;
 }
 
 async function savePricingToDB() {
@@ -1520,6 +1539,8 @@ async function savePricingToDB() {
     ann_buffer_m:  annBufferM.value,
     ann_cluster_m: annClusterM.value,
     ann_consol_km: annConsolKm.value,
+    suivi_freq:    suiviFreq.value,
+    suivi_duree:   suiviDuree.value,
     updated_at:    new Date().toISOString()
   });
 }
@@ -1534,7 +1555,8 @@ function scheduleSavePricing() {
 watch(
   [sub, shpBase, shpScale, shpWH, shpMaxH, shpMaxML, shpProg,
    annDifficulty, annRate, annCloud,
-   annPadding, annBufferM, annClusterM, annConsolKm],
+   annPadding, annBufferM, annClusterM, annConsolKm,
+   suiviFreq, suiviDuree],
   scheduleSavePricing
 );
 
@@ -1697,6 +1719,8 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
 .proj-status-btn.future:hover{background:#bbdefb;}
 .proj-status-btn.inter{background:#fff8e1;color:#f57f17;}
 .proj-status-btn.inter:hover{background:#fff3cd;}
+.proj-status-btn.done{background:var(--gray-100);color:var(--gray-400);}
+.proj-status-btn.done:hover{background:var(--gray-200);}
 .del-btn{background:none;border:none;color:#ccc;cursor:pointer;font-size:15px;line-height:1;padding:0 3px;}
 .del-btn:hover{color:#e53935;}
 .proj-empty{padding:20px;text-align:center;font-size:12px;color:var(--gray-600);}
